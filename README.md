@@ -24,6 +24,14 @@ python3 -m http.server 8000
 Yayına almak için klasörü olduğu gibi herhangi bir statik hostinge koymak yeterli
 (GitHub Pages, Netlify, Vercel, Cloudflare Pages).
 
+### GitHub Pages
+
+`main`'e her itmede `.github/workflows/deploy.yml` çalışır: önce bölüm
+doğrulayıcısını koşar, geçerse yayına alır. Tek seferlik bir ayar gerekiyor —
+**Settings → Pages → Build and deployment → Source: GitHub Actions**. Workflow'un
+kendi jetonunun Pages sitesini ilk kez oluşturma yetkisi yok, o yüzden bu adım
+elle yapılmalı; sonrasında her şey otomatik.
+
 ### Tek dosyalık sürüm
 
 ```bash
