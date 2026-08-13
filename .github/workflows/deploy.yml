@@ -33,9 +33,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      # One-time setup, done in the repo settings rather than here: Pages →
-      # Build and deployment → Source: "GitHub Actions". The workflow token is
-      # not allowed to create the Pages site itself.
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
