@@ -23,6 +23,13 @@ const NAMES = [
   'Kırık Sırt', 'Karanlık Geçit', 'Yüksek Yamaç', 'Dipsiz Yarık', 'Buz Kapanı',
 ];
 
+const NAMES_EN = [
+  'Fracture Line', 'White Noise', 'Cold Current', 'The Polar Belt', 'Frozen Silence',
+  'The Long Night', 'Ice Sea', 'The Parting Continent', 'Last Light', 'Wind Corridor',
+  'Deep Blue', 'The Sound of Cracking', 'Sliding Shelf', 'Glacier Gate', 'New Shore',
+  'Broken Ridge', 'Dark Passage', 'High Slope', 'Bottomless Rift', 'Ice Trap',
+];
+
 /** Weighted pick. A weight of zero removes an option entirely. */
 function weighted(rng, table) {
   const total = table.reduce((n, [, w]) => n + w, 0);
@@ -121,7 +128,7 @@ export function generateLevel(id, opts = {}) {
         // A storm needs a stretch of coast with shelter on it, which is exactly
         // what a shelf is — so it is the only segment one gets hung on.
         if (storms < 1 && d > 0.25 && rng() < 0.45) {
-          c.storm(from, { period: 3.4 + rng() * 0.8 });
+          c.storm(from, { period: 3.6 + rng() * 1.2 });
           storms++;
         }
         break;
@@ -193,7 +200,11 @@ export function generateLevel(id, opts = {}) {
   const def = c.build({
     id,
     name: opts.name ?? NAMES[Math.abs(id - CRAFTED_LEVELS - 1) % NAMES.length],
-    subtitle: opts.subtitle ?? `Sonsuz kaçış — bölüm ${id}`,
+    subtitle: opts.subtitle ?? `Sonsuz kaçış, bölüm ${id}`,
+    en: opts.en ?? {
+      name: NAMES_EN[Math.abs(id - CRAFTED_LEVELS - 1) % NAMES_EN.length],
+      subtitle: `Endless escape, level ${id}`,
+    },
     intro: null,
     generated: true,
     daily: opts.daily ?? false,
@@ -221,6 +232,7 @@ export function generateDailyLevel(dateKey) {
     scale: scaleForLevel(CRAFTED_LEVELS),
     name: 'Günün Bölümü',
     subtitle: dateKey,
+    en: { name: 'Level of the Day', subtitle: dateKey },
     daily: true,
   });
 }

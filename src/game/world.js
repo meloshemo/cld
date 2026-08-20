@@ -6,11 +6,12 @@
  * is pure simulation so it stays easy to reason about.
  */
 
+import { t } from '../core/i18n.js';
 import { Floe, Hazard, Fish, Checkpoint, Rival, Snowball } from './entities.js';
 import { Player } from './player.js';
 import { GhostRecorder, Ghost } from './ghost.js';
 import {
-  VIEW, VIEW_LIMITS, ASSIST, ICE, STORM, SWIM, BRAWL, BOOST, ROT, REWARDS, AMBUSH, COLLAPSE, scaleForLevel, upgradeEffect,
+  VIEW, VIEW_LIMITS, ASSIST, ICE, STORM, WIND, SWIM, BRAWL, BOOST, ROT, REWARDS, AMBUSH, COLLAPSE, scaleForLevel, upgradeEffect,
 } from './config.js';
 import { WATER_Y } from './levels.js';
 import { getSkin } from './skins.js';
@@ -376,14 +377,39 @@ export class World {
     // Wind. A gust is a column you cross; a storm is a stretch of coast where
     // the wind is simply against you and you have to time the lulls.
     let push = 0;
+    let lift = 0;
     this.windPressure = 0;
+    this.windSigned = 0;
+    this.windTail = false;
+    this.windZone = false;
+    this.windCycle = 0;
     for (const h of this.hazards) {
       if (h.kind !== 'gust' && h.kind !== 'storm') continue;
       if (!rectsOverlap(this.player.box, h.box)) continue;
-      const ground = h.kind === 'storm' ? STORM.groundFactor : 0.35;
-      const raw = (h.strength ?? h.power ?? 0) * (this.player.onGround ? ground : 1);
-      push += raw * (1 - this.player.boost.wind);
-      if (h.kind === 'storm') this.windPressure = Math.max(this.windPressure, h.intensity ?? 0);
+
+      if (h.kind === 'gust') {
+        // A column of rising air. It only lifts what is inside it, and it does
+        // nothing to a penguin standing on ice — you have to be off the ground
+        // to be carried, which is what makes it a jump extender rather than a
+        // lift.
+        if (!this.player.onGround) lift += h.lift ?? 0;
+        this.windPressure = Math.max(this.windPressure, h.intensity ?? 0);
+        continue;
+      }
+
+      // Standing still digs the claws in. The counterplay to a headwind is to
+      // stop and let it pass, and it costs the one thing this game charges for
+      // everywhere else: time.
+      const still = this.player.onGround && Math.abs(intent.axis ?? 0) < 0.01;
+      const factor = this.player.onGround ? (still ? WIND.dugIn : WIND.ground) : 1;
+      push += (h.strength ?? 0) * factor * (1 - this.player.boost.wind);
+      this.windZone = true;
+      if (Math.abs(h.signed ?? 0) >= this.windPressure) {
+        this.windPressure = Math.abs(h.signed ?? 0);
+        this.windSigned = (h.signed ?? 0) * (h.dir ?? 1);
+        this.windTail = Boolean(h.tail);
+        this.windCycle = h.cycle ?? 0;
+      }
     }
 
     // Currents. A band of moving water, and the only reason the sea has a wind
@@ -406,11 +432,11 @@ export class World {
         this.particles.burstIce(f.x + f.w / 2, f.y, 20, f.w / 2);
         this.audio.shatter();
         this.shake(6);
-        this.showHint('Buz kaçtı!', 1.2);
+        this.showHint(t('world.iceGone'), 1.2);
       }
     }
 
-    this.player.update(dt, { ...intent, push }, this.solids, this.tuning, {
+    this.player.update(dt, { ...intent, push, lift }, this.solids, this.tuning, {
       onJump: () => {
         this.audio.jump();
         this.particles.puff(this.player.centerX, this.player.y + this.player.h, 6, 0);
@@ -438,7 +464,7 @@ export class World {
         // second while it falls.
         this.audio.crack();
         this.particles.puff(this.player.centerX, this.player.y + this.player.h * 0.4, 8);
-        this.showHint('Tutunamıyorsun!', 1.1);
+        this.showHint(t('world.noGrip'), 1.1);
       },
     });
     this._trackGear(dt);
@@ -505,7 +531,7 @@ export class World {
           this.audio.shatter();
           this.shake(4);
           if (this.rivals.every((o) => !o.guard || o.out)) {
-            this.showHint('Yol açıldı!', 1.6);
+            this.showHint(t('world.wayOpen'), 1.6);
             this.audio.checkpoint();
           }
           stopped = true;
@@ -655,7 +681,7 @@ export class World {
       this.audio.rot();
       this.particles.sparkle(f.x + f.w / 2, f.y + f.h / 2, '#7fbf4d');
       this.shake(3);
-      this.showHint(ROT[f.kind]?.label ?? 'Fena bir şey yedin', 1.6);
+      this.showHint(ROT[f.kind]?.label ?? t('world.badFish'), 1.6);
     }
 
     for (const f of this.boosts) {
@@ -668,7 +694,7 @@ export class World {
       this.particles.sparkle(f.x + f.w / 2, f.y + f.h / 2, '#ff3b48');
       this.particles.sparkle(f.x + f.w / 2, f.y + f.h / 2, '#ffd23f');
       this.shake(4);
-      this.showHint('Hız enerjisi!', 1.4);
+      this.showHint(t('world.boost'), 1.4);
     }
     for (const c of this.checkpoints) {
       if (c.active || !rectsOverlap(this.player.box, c.box)) continue;
@@ -677,7 +703,7 @@ export class World {
       this.respawn = { x: c.x + c.w / 2, y: c.y };
       this.audio.checkpoint();
       this.particles.sparkle(c.x + c.w / 2, c.y - 20, '#7fe7ff');
-      this.showHint('Kontrol noktası', 1.4);
+      this.showHint(t('world.checkpoint'), 1.4);
       // A checkpoint is exactly the position worth keeping if the phone dies.
       this.onCheckpoint?.();
     }
@@ -763,7 +789,7 @@ export class World {
       this.particles.sparkle(this.player.centerX, this.player.y, '#9b8cff');
       this.audio.checkpoint();
       this.shake(4);
-      this.showHint('Kalın tüy seni kurtardı', 1.6);
+      this.showHint(t('world.downSaved'), 1.6);
       return;
     }
 
