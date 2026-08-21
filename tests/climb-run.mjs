@@ -143,6 +143,13 @@ function tryJump(def, solids, a, b, { from, delay, hold }) {
  * and then pulling over the top.
  */
 function tryWall(def, solids, a, b, { from, delay, mode, first }, probe = {}) {
+  // The lowest the arms ever got on a step that worked.
+  //
+  // This is the chapter's real difficulty, the way breath is the sea's: how
+  // precise one kick was is dominated by how coarsely this file happens to
+  // sweep, but how much bar a shaft eats is the thing the player feels and the
+  // thing `effort` moves.
+  let floor = 1;
   const p = makePlayer(def, a.x + a.w * from, a.y);
   const chimney = Boolean(b.chimney);
   const targetX = b.x + b.w / 2;
@@ -258,7 +265,10 @@ function tryWall(def, solids, a, b, { from, delay, mode, first }, probe = {}) {
         jumpHeld = true; // creep, or pull over the top of a single face
       }
     } else if (p.onGround) {
-      if (landedOn(p, b)) return true;
+      if (landedOn(p, b)) {
+          probe.stepFloor = floor;
+          return true;
+        }
       // Breathe first. Standing on ice refills the bar, and setting off again
       // half-charged is how a climb that is comfortably inside the budget
       // fails: the wall is reachable, the arms are not.
@@ -302,6 +312,7 @@ function tryWall(def, solids, a, b, { from, delay, mode, first }, probe = {}) {
     }
 
     p.update(STEP, { axis, jumpHeld, jumpPressed, push: 0 }, solids, TUNING);
+    floor = Math.min(floor, p.staminaFrac);
     t += STEP;
 
     if (p.y < (probe.best ?? Infinity)) probe.best = Math.round(p.y);
@@ -313,7 +324,10 @@ function tryWall(def, solids, a, b, { from, delay, mode, first }, probe = {}) {
       );
     }
     if (drowned(p, def)) return false;
-    if (landedOn(p, b)) return true;
+    if (landedOn(p, b)) {
+      probe.stepFloor = floor;
+      return true;
+    }
     // Generous, because an attempt is a whole session on one wall: fall, land,
     // get the bar back, go again. Simulated seconds are almost free — the whole
     // suite runs in a few real ones — and a cap that cuts a climb two pixels
@@ -333,38 +347,63 @@ const DELAYS = [0, 0.06, 0.12, 0.2, 0.3, 0.42, 0.6, 0.8];
 const HOLDS = [0.5, 0.34, 0.22, 0.15, 0.1];
 const MODES = ['kick', 'creep'];
 
+/**
+ * Measure mode (`--measure`).
+ *
+ * Run the search without letting it stop at the first answer and it reports
+ * *how many* answers there are. That fraction is the closest thing this project
+ * has to a number for difficulty, and it means the same thing in every chapter:
+ * a step a hundred inputs can do is generous, a step two can do is a wall, and
+ * both are equally passable. Collected by `tools/difficulty.mjs`.
+ */
+const MEASURE = process.argv.includes('--measure');
+
 function solveStep(def, solids, a, b, probe = {}) {
+  let ok = 0;
+  let tried = 0;
+  let hit = null;
   if (b.via === 'jump') {
     for (const from of FROMS) {
       for (const delay of DELAYS) {
         for (const hold of HOLDS) {
+          tried++;
           if (tryJump(def, solids, a, b, { from, delay, hold })) {
-            return { from, delay, hold };
+            hit ??= { from, delay, hold };
+            if (!MEASURE) return hit;
+            ok++;
           }
         }
       }
     }
-    return null;
+    probe.width = tried ? ok / tried : 0;
+    return hit;
   }
   for (const from of FROMS) {
     for (const delay of DELAYS) {
       for (const mode of MODES) {
         for (const first of [1, -1]) {
+          tried++;
           if (tryWall(def, solids, a, b, { from, delay, mode, first }, probe)) {
-            return { from, delay, mode, first };
+            hit ??= { from, delay, mode, first };
+            probe.spare = Math.min(probe.spare ?? 1, probe.stepFloor ?? 1);
+            if (!MEASURE) return hit;
+            ok++;
           }
         }
       }
     }
   }
-  return null;
+  probe.width = tried ? ok / tried : 0;
+  return hit;
 }
 
 /* ------------------------------------------------------------------ */
 
-console.log('Tırmanışlar gerçek fizikle deneniyor...\n');
-console.log('(Sadece yayındaki bölümler. climb.js\'te ship:false olanlar,');
-console.log(' bu çözücü bir yol bulana kadar oyuna girmiyor.)\n');
+if (!MEASURE) {
+  console.log('Tırmanışlar gerçek fizikle deneniyor...\n');
+  console.log('(Sadece yayındaki bölümler. climb.js\'te ship:false olanlar,');
+  console.log(' bu çözücü bir yol bulana kadar oyuna girmiyor.)\n');
+}
 
 let failed = 0;
 let held = 0;
@@ -382,6 +421,9 @@ for (const def of suite) {
   const solids = solidsOf(def);
   const route = def.route;
   const bad = [];
+  const widths = [];
+  const bars = [];
+  
   for (let i = 1; i < route.length; i++) {
     steps++;
     const probe = {};
@@ -391,8 +433,20 @@ for (const def of suite) {
       probe.log = [];
     }
     const found = solveStep(def, solids, route[i - 1], route[i], probe);
+    if (MEASURE && found) {
+      widths.push(probe.width ?? 1);
+      if (probe.spare != null) bars.push(probe.spare);
+    }
     if (probe.trace) console.log(probe.log.slice(-60).join('\n'));
     if (!found) bad.push(`${i}. adım (${route[i].via}) yapılamıyor: y ${route[i - 1].y} → ${route[i].y} (en yüksek ${probe.best ?? '-'})`);
+  }
+  if (MEASURE) {
+    const tight = widths.length ? Math.min(...widths) : 0;
+    // The lowest the bar got on any step of this climb, which is the chapter's
+    // own resource reading and the number `effort` actually moves.
+    const spare = bars.length ? Math.min(...bars) : 1;
+    console.log(`MEASURE ${def.id} ${tight.toFixed(4)} ${spare.toFixed(4)} ${widths.length}`);
+    continue;
   }
   if (!bad.length && process.argv.includes('--list')) console.log(`GECTI ${def.id} ${def.name}`);
   if (bad.length) {
@@ -402,6 +456,8 @@ for (const def of suite) {
     for (const line of bad) console.log(`    ${line}`);
   }
 }
+
+if (MEASURE) process.exit(0);
 
 console.log(`\n${steps} adım denendi, ${((Date.now() - t0) / 1000).toFixed(1)} sn`);
 if (held) console.log(`${held} adım, henüz yayına girmemiş planlarda.`);
