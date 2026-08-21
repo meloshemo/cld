@@ -46,18 +46,22 @@ jobs:
           node-version: '20'
       - name: Tek dosya sürümünü üret
         run: node tools/bundle.mjs dist/pengu.html
-      # `enablement` turns Pages on through the API rather than requiring
-      # somebody to find the setting in the web interface first.
+      # One setting has to be turned on by hand, once, before this workflow can
+      # ever publish anything:
       #
-      # Without it this step had failed on every single push — thirty-two runs,
-      # all of them green through the whole test suite and then dead one line
-      # later on "Get Pages site failed ... Not Found", which is what the API
-      # says when Pages has never been switched on for the repository. The
-      # tests were passing and nothing was ever published, which is the worst
-      # shape a deploy can have: it looks fine from the commit list.
+      #   Settings → Pages → Build and deployment → Source: GitHub Actions
+      #
+      # Until somebody does that, this step fails with "Get Pages site failed
+      # ... Not Found" while every other job stays green — which is the worst
+      # shape a deploy can have, because from the commit list it looks like it
+      # worked. Thirty-two runs failed here before anyone looked at the log.
+      #
+      # `enablement: true` was tried and is not a way around it: the action then
+      # asks the API to create the site and gets "Resource not accessible by
+      # integration", because creating a Pages site needs admin rights that the
+      # workflow's own token is not allowed to have. That is a deliberate limit
+      # on GitHub's side, not a misconfiguration here.
       - uses: actions/configure-pages@v5
-        with:
-          enablement: true
       - uses: actions/upload-pages-artifact@v3
         with:
           path: .
