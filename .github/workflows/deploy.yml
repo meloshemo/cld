@@ -46,7 +46,18 @@ jobs:
           node-version: '20'
       - name: Tek dosya sürümünü üret
         run: node tools/bundle.mjs dist/pengu.html
+      # `enablement` turns Pages on through the API rather than requiring
+      # somebody to find the setting in the web interface first.
+      #
+      # Without it this step had failed on every single push — thirty-two runs,
+      # all of them green through the whole test suite and then dead one line
+      # later on "Get Pages site failed ... Not Found", which is what the API
+      # says when Pages has never been switched on for the repository. The
+      # tests were passing and nothing was ever published, which is the worst
+      # shape a deploy can have: it looks fine from the commit list.
       - uses: actions/configure-pages@v5
+        with:
+          enablement: true
       - uses: actions/upload-pages-artifact@v3
         with:
           path: .
