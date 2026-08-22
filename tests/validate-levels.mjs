@@ -352,6 +352,92 @@ function check(def, { tutorial = false } = {}) {
     }
   }
 
+  /**
+   * --- snap floes have to be alone under the sky ------------------------
+   *
+   * A snap floe does not wait to be stood on. It fires when a falling penguin
+   * is within a quarter of a second of its surface, which is the whole point:
+   * it is gone by the time your feet arrive. What that also means is that it
+   * fires for a penguin who is not aiming at it at all — one landing on a
+   * different floe, a little above and slightly overlapping.
+   *
+   * Level eighteen shipped like that. Four snap floes tucked under the floes
+   * the route lands on, firing on every correct landing, shattering ice the
+   * player could not see and had not touched. Nothing caught it: the geometry
+   * was legal, the level was passable, and the only symptom was a noise.
+   *
+   * So: nothing may hang over a snap floe within the height a fall crosses in
+   * the trigger window. If something does, the snap is not a trap, it is a
+   * rumour going off under the floor.
+   *
+   * Read from `all` rather than `floes`, because `floes` is the *route* — snap
+   * ice is filtered out of it precisely so the reachability rules ignore
+   * something that will not be there. That filter is right, and it is also why
+   * a check written against `floes` found nothing at all when it was pointed
+   * at the very level it was written for.
+   */
+  const snapDrop = PHYS.maxFall * ICE.snapTrigger;
+  for (const f of all) {
+    if (f.type !== 'snap') continue;
+    for (const other of all) {
+      if (other === f) continue;
+      if (other.x + other.w <= f.x || other.x >= f.x + f.w) continue;
+      const above = f.y - other.y;
+      if (above > 0 && above < snapDrop) {
+        fail(
+          `kaçan buz (x=${f.x}) başka bir buzun altında: ${Math.round(above)}px, ` +
+            `tetik mesafesi ${Math.round(snapDrop)}px`,
+        );
+      }
+    }
+  }
+
+  /**
+   * --- the menace dial has a floor -------------------------------------
+   *
+   * `menace` speeds up everything that moves, and it exists because the
+   * geometric dial ran out — the widest gap on the last levels is already
+   * exactly what a running jump clears, so the only honest way left to make
+   * them harder is to give the player less time rather than more distance.
+   *
+   * Less time has a floor, and this is it. None of these rules is about
+   * whether a level is hard; they are about whether the hazard is a clock the
+   * player can read or a coin flip with an animation on it:
+   *
+   *   an icicle's warning must stay long enough to walk a body out from under;
+   *   a seal must stay slower than the penguin, or being on the same floe as
+   *     one is death regardless of what you do;
+   *   an orca must stay under water longer than it takes to cross its gap.
+   *
+   * Nothing here checks a distance, because `menace` never changes one. That
+   * is the whole reason it was chosen over widening the ice.
+   */
+  const menace = def.menace ?? 1;
+  if (menace > 1.35) fail(`hız çarpanı fazla yüksek: ${menace}`);
+  const bodyOut = (PENGUIN.w * scale) / PHYS.moveSpeed;
+  for (const h of def.hazards ?? []) {
+    if (h.kind === 'icicle') {
+      const warn = 0.42 / menace;
+      if (warn < bodyOut * 1.35) {
+        fail(`sarkıt uyarısı çok kısa: ${warn.toFixed(2)} sn, kaçış ${(bodyOut * 1.35).toFixed(2)} sn`);
+      }
+    }
+    if (h.kind === 'seal') {
+      const speed = (h.speed ?? 70) * menace;
+      if (speed > PHYS.moveSpeed * 0.72) {
+        fail(`fok penguenden hızlı: ${Math.round(speed)} px/sn, yürüyüş ${PHYS.moveSpeed}`);
+      }
+    }
+    if (h.kind === 'orca') {
+      const period = (h.period ?? 3.2) / menace;
+      // Time to walk the gap it surfaces in, plus the jump over it.
+      const cross = (h.w ?? 76) / PHYS.moveSpeed + reach.distance / PHYS.moveSpeed;
+      if (period < cross) {
+        fail(`orka döngüsü çok kısa: ${period.toFixed(2)} sn, geçiş ${cross.toFixed(2)} sn`);
+      }
+    }
+  }
+
   // --- the speed fish -------------------------------------------------
   for (const f of def.speedFish ?? []) {
     const ok = floes.some((p) => {
