@@ -168,15 +168,20 @@ const DIVE_PLANS = [
     target: 52,
     depth: 600,
     breath: 0.78,
-    /* Top, bottom, top, bottom. The distance is ordinary and the level is not,
-       because in this chapter depth is the thing that costs. */
+    /* Top, bottom, top, bottom — and this is the level where that finally
+       means something. The comment here used to claim depth was the thing that
+       cost, and it was not true: the clock ran at one second per second
+       wherever the swimmer was. The first cold band is on the second descent,
+       so the sentence the level was already telling itself becomes true
+       halfway through it. */
     build: (d) => {
       d.mouth();
       d.gate({ at: 0.2, gap: 168 });
       d.gate({ at: 0.8, gap: 166 });
       d.gate({ at: 0.22, gap: 164 });
       d.hole();
-      d.gate({ at: 0.82, gap: 162 });
+      d.trench({ at: 0.66, dip: 0.5, len: 320 });
+      d.hole();
       d.gate({ at: 0.24, gap: 162 });
       d.stretch({ gap: 165, from: 0.26 });
       d.surfaceOut();
@@ -199,7 +204,12 @@ const DIVE_PLANS = [
       d.gate({ at: 0.72, gap: 156 });
       d.gate({ at: 0.76, gap: 152 });
       d.hole();
-      d.gate({ at: 0.8, gap: 150 });
+      // Squeezed from both sides at once. Every slot on this level is already
+      // down in the expensive half of the water because the ceiling never
+      // lifts — and now the expensive half is expensive for a reason. The
+      // trench is shallow-lipped on purpose: the swimmer has no choice about
+      // being low, so the level must not also charge them the full rate for it.
+      d.trench({ at: 0.7, dip: 0.42, len: 300 });
       d.gate({ at: 0.78, gap: 148 });
       d.stretch({ gap: 152, from: 0.66 });
       d.surfaceOut();
@@ -223,6 +233,12 @@ const DIVE_PLANS = [
       d.gate({ at: 0.4, gap: 160 });
       d.seal({ span: 360, speed: 175 });
       d.hole();
+      // The cheap way past a leopard seal has always been to go under it. Now
+      // under it is where the air goes, so the third one has to be dodged
+      // upward — into the ceiling, in a corridor, with a seal in it. The level
+      // is called The Pack and this is the level saying what a pack is: not
+      // three of the same problem, but a problem that closes a door each time.
+      d.trench({ at: 0.6, dip: 0.42, len: 260 });
       d.seal({ span: 340, speed: 170 });
       d.stretch({ gap: 162, from: 0.36 });
       d.surfaceOut();
@@ -268,6 +284,11 @@ const DIVE_PLANS = [
       d.mouth();
       d.stretch({ gap: 165, len: 320, from: 0.3 });
       d.hole();
+      // The second lungful is the one that has to be spent well, so this is
+      // where the cold goes. It is deep and it is right after the only breath
+      // on the level, which means the choice is made at the moment the player
+      // has the most air and the least reason to think about it.
+      d.trench({ at: 0.6, dip: 0.66, len: 340 });
       d.gate({ at: 0.7, gap: 160 });
       d.stretch({ gap: 162, len: 300, from: 0.34 });
       d.surfaceOut();
@@ -294,7 +315,12 @@ const DIVE_PLANS = [
       d.gate({ at: 0.7, gap: 146 });
       d.hole();
       d.gate({ at: 0.32, gap: 144 });
-      d.gate({ at: 0.72, gap: 144 });
+      // The level alternates shallow and deep, over and over, and until now
+      // the two halves of that alternation cost the same. Putting the cold
+      // under the second half turns a rhythm into a question: the shallow
+      // slots are rests and the deep ones are the bill, and the fishbone
+      // finally has a wide end and a narrow one.
+      d.trench({ at: 0.68, dip: 0.5, len: 300 });
       d.stretch({ gap: 146, len: 200, from: 0.3 });
       d.surfaceOut();
       d.scatterFish(3);
@@ -331,14 +357,18 @@ const DIVE_PLANS = [
     en: { name: 'The Road on the Bottom', subtitle: 'The ceiling has closed entirely' },
     target: 70,
     depth: 660,
-    breath: 0.9,
-    /* Pinned to the seabed from end to end. The cheap direction is gone: there
-       is no rising to rest, only the button and the dark. */
+    breath: 0.82,
+    /* Pinned to the seabed from end to end, and now the seabed is the cold.
+       The cheap direction is gone twice over: there is no rising to rest,
+       because the slots are all at the bottom, and there is no resting at the
+       bottom, because the bottom is where the air goes. The two halves of that
+       sentence used to be one half. */
     build: (d) => {
       d.mouth();
       d.gate({ at: 0.84, gap: 146 });
       d.gate({ at: 0.86, gap: 144 });
-      d.gate({ at: 0.88, gap: 142 });
+      d.hole();
+      d.trench({ at: 0.58, dip: 0.72, len: 380 });
       d.hole();
       d.current({ power: -200, band: 0.78 });
       d.gate({ at: 0.86, gap: 142 });
