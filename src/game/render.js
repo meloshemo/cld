@@ -8,7 +8,9 @@
  * hazards → penguin → particles → weather → post effects.
  */
 
-import { VIEW, VIEW_LIMITS, AMBUSH, CHARGED, COIL, QUANTUM, SLACK, CLIMB, BRAWL } from './config.js';
+import {
+  VIEW, VIEW_LIMITS, AMBUSH, CHARGED, COIL, QUANTUM, SLACK, CLIMB, BRAWL, lobShot,
+} from './config.js';
 import { getSkin, getTrail } from './skins.js';
 import { clamp, lerp, makeRng } from '../core/util.js';
 
@@ -617,6 +619,70 @@ export class Renderer {
     if (!world.zones?.length) return;
     const view = this._viewBounds(world);
 
+    /**
+     * The hush, drawn behind everything.
+     *
+     * It has one job and it is a hard one: to say "the rules are different in
+     * here" from across a level, to a player who has never seen one, without a
+     * word of text. Three things do the work together.
+     *
+     * The edge is a hard, bright line rather than a fade, because a soft edge
+     * would be a lie — gravity changes at a boundary, not over a gradient, and
+     * a player who misjudges where the pocket starts has been misled by the
+     * drawing rather than by their own eyes.
+     *
+     * The air inside is full of snow that has stopped falling properly. Motes
+     * drift down at a fraction of the speed of everything else on screen, and
+     * that contrast is the mechanic stated without naming it: whatever is in
+     * here is not being pulled the way you are used to.
+     *
+     * And the colour is cold and pale rather than dark. Every other zone in
+     * this game closes in on you — the tunnel goes black, the crevasse goes
+     * blue-black. This one opens up.
+     */
+    for (const z of world.zones) {
+      if (z.kind !== 'hush') continue;
+      if (z.x + z.w < view.left || z.x > view.right) continue;
+      const h = z.bottom - z.top;
+
+      const g = ctx.createLinearGradient(0, z.top, 0, z.bottom);
+      g.addColorStop(0, 'rgba(196,232,255,0.16)');
+      g.addColorStop(0.5, 'rgba(168,214,255,0.09)');
+      g.addColorStop(1, 'rgba(150,200,250,0.03)');
+      ctx.fillStyle = g;
+      ctx.fillRect(z.x, z.top, z.w, h);
+
+      ctx.save();
+      ctx.strokeStyle = 'rgba(214,242,255,0.5)';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([10, 8]);
+      ctx.lineDashOffset = -time * 14;
+      ctx.strokeRect(z.x, z.top, z.w, h);
+      ctx.setLineDash([]);
+
+      if (!this.reducedMotion) {
+        ctx.beginPath();
+        ctx.rect(z.x, z.top, z.w, h);
+        ctx.clip();
+        // Deterministic, so the same hollow looks the same every attempt: a
+        // level you are learning must not be redecorated between tries.
+        const rng = makeRng(Math.round(z.x * 31 + z.top));
+        ctx.fillStyle = 'rgba(232,248,255,0.55)';
+        for (let i = 0; i < 46; i++) {
+          const bx = z.x + rng() * z.w;
+          const drift = Math.sin(time * 0.5 + i) * 9;
+          // A fifth of the speed of falling snow, and never resetting with a
+          // jump: it just keeps coming down, forever, slowly.
+          const by = z.top + ((rng() * h + time * 15 + i * 7) % h);
+          const r = 1.1 + rng() * 1.5;
+          ctx.beginPath();
+          ctx.arc(bx + drift, by, r, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+      ctx.restore();
+    }
+
     for (const z of world.zones) {
       if (z.kind !== 'tunnel') continue;
       if (z.x + z.w < view.left || z.x > view.right) continue;
@@ -847,6 +913,54 @@ export class Renderer {
         ctx.ellipse(dx, y + 22 + drip, 2.4, 4 + drip * 0.3, 0, 0, Math.PI * 2);
         ctx.fill();
       }
+    }
+
+    /**
+     * The rope, and the thing it is tied to.
+     *
+     * Without them a hanging slab is a floating platform on a curved path, and
+     * a player has no way to know it will slow at the ends and race through
+     * the middle. With them it is a pendulum, and everybody already knows what
+     * a pendulum does — the drawing is doing the teaching that would otherwise
+     * need a sign.
+     *
+     * Two ropes rather than one, from the two upper corners of the slab, so it
+     * reads as hanging rather than as skewered. And the anchor is drawn as a
+     * spike driven into the rock overhead, because a rope tied to nothing is
+     * the one thing that would make the whole idea look like a bug.
+     */
+    if (f.type === 'swing') {
+      const topY = y + 2;
+      ctx.save();
+      ctx.strokeStyle = 'rgba(214,232,248,0.7)';
+      ctx.lineWidth = 2;
+      ctx.lineCap = 'round';
+      for (const sgn of [-1, 1]) {
+        ctx.beginPath();
+        ctx.moveTo(f.pivotX, f.pivotY);
+        ctx.lineTo(cx + sgn * (w / 2 - 10), topY);
+        ctx.stroke();
+      }
+      // The anchor.
+      ctx.fillStyle = '#4a5568';
+      ctx.beginPath();
+      ctx.moveTo(f.pivotX - 13, f.pivotY - 5);
+      ctx.lineTo(f.pivotX + 13, f.pivotY - 5);
+      ctx.lineTo(f.pivotX, f.pivotY + 8);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = '#8fa4bd';
+      ctx.beginPath();
+      ctx.arc(f.pivotX, f.pivotY - 4, 3.4, 0, Math.PI * 2);
+      ctx.fill();
+      // A shackle where the ropes meet the ice, so the eye follows them down.
+      ctx.fillStyle = 'rgba(160,190,220,0.85)';
+      for (const sgn of [-1, 1]) {
+        ctx.beginPath();
+        ctx.arc(cx + sgn * (w / 2 - 10), topY, 3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
     }
 
     if (f.type === 'move') {
@@ -2103,8 +2217,46 @@ export class Renderer {
         continue;
       }
 
+      /**
+       * A lob's telegraph is the arc it will actually take.
+       *
+       * The straight aim line is the whole user interface of this chapter, and
+       * for a thrower who arcs it over a pillar a straight line is not merely
+       * unhelpful, it is a lie — it points at the pillar the ball is going to
+       * clear. So the arc is drawn from the same ballistics the ball will fly,
+       * with the landing spot marked on the ice, because what a lobbed shot
+       * takes away is the safety of a place rather than the safety of a line.
+       */
+      if (r.aim && r.lobs && !this.reducedMotion) {
+        const hand = r.hand;
+        const shot = lobShot(hand, r.aim);
+        const charge = clamp(1 - r.timer / BRAWL.windup, 0, 1);
+        ctx.save();
+        ctx.setLineDash([8, 8]);
+        ctx.lineDashOffset = -time * 60;
+        ctx.strokeStyle = `rgba(255,214,150,${0.26 + charge * 0.5})`;
+        ctx.lineWidth = 1.6 + charge * 1.6;
+        ctx.beginPath();
+        for (let i = 0; i <= 26; i++) {
+          const t = (i / 26) * shot.time;
+          const px = hand.x + shot.vx * t;
+          const py = hand.y + shot.vy * t + 0.5 * BRAWL.lobGravity * t * t;
+          if (i === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+        }
+        ctx.stroke();
+        ctx.setLineDash([]);
+        // Where it comes down. This is the part the player has to leave.
+        ctx.strokeStyle = `rgba(255,190,120,${0.4 + charge * 0.5})`;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.ellipse(r.aim.x, r.aim.y, 16 + charge * 6, 6 + charge * 2, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+
       // The aim, while it is being taken.
-      if (r.aim && !this.reducedMotion) {
+      if (r.aim && !r.lobs && !this.reducedMotion) {
         const hand = r.hand;
         const dx = r.aim.x - hand.x;
         const dy = r.aim.y - hand.y;

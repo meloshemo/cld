@@ -87,6 +87,136 @@ export function reachFor(scale, maxHeight = Infinity) {
   return { distance: speed * (tUp + tDown), height, full };
 }
 
+/**
+ * The hush.
+ *
+ * A pocket of still, dense, freezing air trapped in a hollow, and the only
+ * thing in the game that changes the number every other number is measured
+ * against. Inside it gravity is less than half what it is outside, so the
+ * penguin does not jump higher because it is stronger — it jumps higher
+ * because the world stopped pulling so hard.
+ *
+ * This is a bigger idea than it looks. Wind changes where a jump lands; a
+ * geyser changes how a jump starts; the hush changes *what a jump is*. Reach
+ * roughly doubles in both directions at once, which means a hush can hold a
+ * gap no penguin can cross and a shelf no penguin can reach, in the same
+ * hollow, and both are fair because both are visible from outside.
+ *
+ * Why it is not simply "easy mode in a box": you have to be *inside* it for it
+ * to work, its edge is drawn, and the arc it gives you is long enough that
+ * committing to one is a decision you cannot take back halfway. A jump that
+ * takes a second and a half to land is a jump you have to aim.
+ *
+ * The floor is a real limit and not taste. Below about a third, the fall back
+ * down takes so long that the level stops being a platformer and starts being
+ * a slow descent through a room, and every hazard in it becomes trivial
+ * because you are simply never where it is.
+ */
+export const HUSH = {
+  /** What gravity runs at inside the pocket. */
+  gravity: 0.42,
+  /** Nothing under this: below it the game stops being a platformer. */
+  floor: 0.34,
+  /**
+   * Terminal velocity is scaled too.
+   *
+   * Without this a penguin that entered the pocket already falling fast kept
+   * that speed all the way through, and the hush read as broken exactly when
+   * the player most needed it: on the way in from above.
+   */
+  fall: 0.55,
+};
+
+/**
+ * Reach inside a hush pocket.
+ *
+ * The same derivation as `reachFor`, with gravity scaled. Written as its own
+ * function rather than a parameter with a default, because every call site
+ * that measures a level has to say out loud which physics it is measuring in.
+ */
+export function reachInHush(scale, maxHeight = Infinity, factor = HUSH.gravity) {
+  const g = Math.max(HUSH.floor, factor);
+  const v = Math.abs(PHYS.jumpVelocity) * (1 - PENGUIN.jumpPenaltyPerScale * (scale - 1));
+  const speed = PHYS.moveSpeed * (1 - PENGUIN.speedPenaltyPerScale * (scale - 1));
+  const full = (v * v) / (2 * PHYS.gravityUp * g);
+  const height = Math.max(0, Math.min(full, maxHeight));
+  const tUp = Math.sqrt((2 * height) / (PHYS.gravityUp * g));
+  const tDown = Math.sqrt((2 * height) / (PHYS.gravityDown * g));
+  return { distance: speed * (tUp + tDown), height, full, hang: tUp + tDown };
+}
+
+/**
+ * Is this point inside a hush pocket, and how strong is it?
+ *
+ * Lives here, next to the physics it changes, because three separate pieces of
+ * code need the answer and they must never disagree: the world that runs the
+ * game, and the two solvers that prove the levels can be finished. Those
+ * solvers model the world's forces themselves rather than instantiating it,
+ * which is fast and which is exactly the kind of duplication that rots — the
+ * first hush level was declared uncrossable by a solver that had simply never
+ * been told gravity could change.
+ *
+ * Measured at the middle of the body rather than by overlap. A pocket that
+ * switched on the instant a wingtip crossed the line would stutter at the
+ * boundary, and a player aiming a jump with two different gravities in it has
+ * been handed a coin flip.
+ */
+export function hushAt(zones, cx, cy) {
+  if (!zones) return 1;
+  for (const z of zones) {
+    if (z.kind !== 'hush') continue;
+    if (cx < z.x || cx > z.x + z.w || cy < z.top || cy > z.bottom) continue;
+    return Math.max(HUSH.floor, z.gravity ?? HUSH.gravity);
+  }
+  return 1;
+}
+
+/**
+ * A hanging slab of ice, and how long it takes to swing.
+ *
+ * The period is not a dial. It is `2π√(L/g)`, the actual small-angle period of
+ * a pendulum, worked out from the length of the rope and the gravity this game
+ * already uses — so a level author chooses how long the rope is and the timing
+ * follows from that, the way `reachFor` makes a gap either possible or not
+ * rather than either fun or not.
+ *
+ * This matters more than it sounds. A swinging platform whose speed is a typed
+ * constant is a moving platform with a curved path; one whose speed comes from
+ * its length is a *pendulum*, and players read pendulums correctly on sight
+ * because they have been watching them their whole lives. A long rope is slow
+ * and a short rope is quick, and nobody has to be told.
+ *
+ * Small-angle is a real approximation and it is kept honest by capping the
+ * swing at thirty-five degrees, where the true period is under two percent
+ * longer than this formula says. Past that the two drift apart, and a
+ * platform that arrives late by a tenth of a second is a platform that lies.
+ */
+export const SWING = {
+  /** Widest the arc may be, in radians, for the small-angle period to hold. */
+  maxAngle: 0.61,
+  /** Shortest rope worth drawing: below this it reads as a wobble. */
+  minLength: 110,
+};
+
+export function swingPeriod(len) {
+  return 2 * Math.PI * Math.sqrt(Math.max(SWING.minLength, len) / PHYS.gravityDown);
+}
+
+/**
+ * Where a hanging slab is, and how fast, at a given moment.
+ *
+ * One definition, called by the entity that draws it, the composer that places
+ * it and the validator that proves you can ride it — the same discipline that
+ * `windAt` and `hushAt` are under, and for the same reason: three pieces of
+ * code that each work out a moving platform's position separately will
+ * eventually disagree about where it is.
+ */
+export function swingAt(len, angle, phase, time) {
+  const t = (time / swingPeriod(len) + phase) * Math.PI * 2;
+  const th = Math.min(SWING.maxAngle, angle) * Math.sin(t);
+  return { dx: Math.sin(th) * len, dy: Math.cos(th) * len, angle: th };
+}
+
 /** Timings for the different ice behaviours (seconds). */
 export const ICE = {
   /** "crack": time between first touch and collapse. */
@@ -774,6 +904,28 @@ export const BRAWL = {
   range: 1250,
   /** How much of a body a shot must cover to count as lined up. */
   hitFrac: 0.55,
+  /**
+   * The lob.
+   *
+   * Every snowball in this chapter travels in a straight line, and that one
+   * fact hands the arena a single static answer: stand behind something. A
+   * pillar is a hard counter to a mechanic built entirely out of sight-lines,
+   * and once a player finds that out, four of the fifteen levels stop being
+   * about anything.
+   *
+   * A lobbed shot goes over it. Same thrower, same wind-up, same tell — it
+   * simply leaves the hand at an angle and comes down under gravity, so cover
+   * that was a wall is now a thing you have to *leave*.
+   *
+   * The trade is deliberate and it is what keeps it fair: an arc is much
+   * slower than a line, so a lob gives the player far more time to react than
+   * a flat shot ever does. It takes away the free answer and pays for it in
+   * seconds. `dodgeWindow` measures the real flight either way, so a level's
+   * fairness proof does not need to know which kind it is looking at.
+   */
+  lobGravity: 900,
+  /** How high over the straight line the arc peaks, as a fraction of range. */
+  lobArc: 0.42,
 };
 
 /**
@@ -784,6 +936,35 @@ export const BRAWL = {
  */
 export function dodgeWindow(distance) {
   return BRAWL.windup + distance / BRAWL.speed;
+}
+
+/**
+ * The opening velocity of a lobbed snowball, and how long it stays up.
+ *
+ * Given where it leaves the hand and where it has to arrive, there is one free
+ * choice — how high to throw it — and that is `lobArc`, an apex set as a
+ * fraction of the range so a long lob is a high one and a short lob is a
+ * gentle toss. Everything else follows from wanting it to land on the target:
+ * pick the flight time from the rise, and the horizontal speed is the distance
+ * divided by it.
+ *
+ * Returned with the flight time, because a lob's fairness lives there. A flat
+ * shot is over in a fifth of a second and this takes the best part of two, so
+ * a level containing one is measured against the number this hands back rather
+ * than against `BRAWL.speed`.
+ */
+export function lobShot(from, to) {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const range = Math.max(1, Math.abs(dx));
+  const g = BRAWL.lobGravity;
+  // Apex measured above the higher of the two ends, so the arc always clears
+  // whatever is between them even when the throw is uphill.
+  const rise = Math.max(60, range * BRAWL.lobArc) + Math.max(0, -dy);
+  const up = Math.sqrt(2 * g * rise);
+  // Time to come back down to the target's height, from the apex.
+  const time = up / g + Math.sqrt((2 * (rise + dy)) / g);
+  return { vx: dx / time, vy: -up, time, rise };
 }
 
 /** Assist mode is offered after this many deaths on the same level. */

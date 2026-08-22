@@ -5,7 +5,9 @@
  * `{x, y, w, h}` box that the collision code in level.js consumes.
  */
 
-import { ICE, STORM, BRAWL, WIND, windAt, tailWindow, lullWindow } from './config.js';
+import {
+  ICE, STORM, BRAWL, WIND, SWING, windAt, swingAt, lobShot, tailWindow, lullWindow,
+} from './config.js';
 import { clamp, easeOutCubic, lerp } from '../core/util.js';
 
 /* ------------------------------------------------------------------ */
@@ -37,6 +39,13 @@ export class Floe {
 
     // Movement path (type: 'move')
     this.ax = def.ax ?? 0;
+    // The rope (type: 'swing'). Length decides the period, so it is the only
+    // thing a level author picks.
+    this.pivotX = def.pivotX ?? def.x;
+    this.pivotY = def.pivotY ?? 0;
+    this.ropeLen = def.ropeLen ?? 200;
+    this.ropeAngle = def.ropeAngle ?? SWING.maxAngle;
+    this.angle = 0;
     this.ay = def.ay ?? 0;
     this.period = def.period ?? 3;
     this.phase = def.phase ?? 0;
@@ -161,6 +170,33 @@ export class Floe {
   update(dt, time, ctxFx) {
     this.dx = 0;
     this.dy = 0;
+
+    /**
+     * A slab hanging on a rope.
+     *
+     * Not a moving platform with a curved path: a pendulum. It is fastest at
+     * the bottom of the arc and it hangs almost still at the ends, and those
+     * two facts are the whole reason it is worth having — the timing is
+     * legible on sight to anybody who has ever watched a swing, so a player
+     * knows to step on at the moment it stops without having to be told, and
+     * knows that the middle of the arc is where it will run away from them.
+     *
+     * `dx`/`dy` are the frame's movement, which is how a rider gets carried:
+     * the player adds them to its own position while it is standing here. Down
+     * near the bottom of a long arc that is a real shove, and staying on
+     * during it is the skill the thing is asking for.
+     */
+    if (this.type === 'swing') {
+      const prevX = this.x;
+      const prevY = this.y;
+      const at = swingAt(this.ropeLen, this.ropeAngle, this.phase, time);
+      this.angle = at.angle;
+      this.x = this.pivotX - this.w / 2 + at.dx;
+      this.y = this.pivotY + at.dy;
+      this.dx = this.x - prevX;
+      this.dy = this.y - prevY;
+      return;
+    }
 
     if (this.type === 'move') {
       const prevX = this.x;
@@ -621,6 +657,8 @@ export class Rival {
     /** Offset into the cycle, so a room full of rivals is not a volley. */
     this.phase = def.phase ?? 0;
     this.facing = def.facing ?? -1;
+    /** Throws over cover instead of through it. */
+    this.lobs = def.lobs ?? false;
     this.skin = def.skin ?? 'rival';
     this.reset();
   }
@@ -696,20 +734,32 @@ export class Rival {
  * a rival, the player, or ice.
  */
 export class Snowball {
-  constructor(from, to) {
-    const dx = to.x - from.x;
-    const dy = to.y - from.y;
-    const len = Math.hypot(dx, dy) || 1;
+  constructor(from, to, lobbed = false) {
     this.x = from.x;
     this.y = from.y;
-    this.vx = (dx / len) * BRAWL.speed;
-    this.vy = (dy / len) * BRAWL.speed;
     this.r = BRAWL.radius;
-    this.life = 3.2;
     this.dead = false;
     this.spin = 0;
     /** Where it came from, so a thrower never shoots itself. */
     this.origin = from;
+    /** A lob falls; a flat shot does not. */
+    this.lobbed = lobbed;
+    if (lobbed) {
+      const shot = lobShot(from, to);
+      this.vx = shot.vx;
+      this.vy = shot.vy;
+      // Long enough for the whole arc plus a margin, rather than the flat
+      // shot's fixed three seconds: a lob that expired at its apex would be a
+      // threat that evaporates, which is worse than no threat at all.
+      this.life = shot.time * 1.6 + 0.6;
+      return;
+    }
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const len = Math.hypot(dx, dy) || 1;
+    this.vx = (dx / len) * BRAWL.speed;
+    this.vy = (dy / len) * BRAWL.speed;
+    this.life = 3.2;
   }
 
   get box() {
@@ -717,9 +767,12 @@ export class Snowball {
   }
 
   update(dt) {
+    if (this.lobbed) this.vy += BRAWL.lobGravity * dt;
     this.x += this.vx * dt;
     this.y += this.vy * dt;
-    this.spin += dt * 14;
+    // A lob tumbles rather than spins: it is in the air four times as long, and
+    // at flat-shot spin speed it reads as a drill bit.
+    this.spin += dt * (this.lobbed ? 5 : 14);
     this.life -= dt;
     if (this.life <= 0) this.dead = true;
   }

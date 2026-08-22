@@ -32,8 +32,7 @@ import {
   reachFor,
   reachAt,
   kickGain,
-  climbBudget,
-} from '../src/game/config.js';
+  climbBudget, reachInHush} from '../src/game/config.js';
 import { CLIMB_LEVELS, CLIMB_FROM } from '../src/game/climb.js';
 
 let failures = 0;
@@ -114,6 +113,83 @@ function validate(def) {
           `${i}. adım çok uzak: ${Math.round(gap)}px, ` +
             `${Math.round(rise)}px yükselirken erişim ${Math.round(allowed)}px`,
         );
+      }
+      continue;
+    }
+
+    /**
+     * A step taken inside a band of dead air.
+     *
+     * The one step in this chapter that does not happen under this chapter's
+     * gravity, so it is the one step measured against different arithmetic —
+     * and it has to fail two ways rather than one. Too small and the band is
+     * decoration bolted over a step anybody could take; too big and it is a
+     * wall with a promise painted on it.
+     */
+    if (b.via === 'hush') {
+      const pocket = (def.zones ?? []).find(
+        (z) => z.kind === 'hush' && z.top <= b.y && z.bottom >= a.y,
+      );
+      if (!pocket) {
+        fail(`${i}. adım sessiz alanın içinde değil`);
+        continue;
+      }
+      const quiet = reachInHush(scale, Infinity, pocket.gravity);
+      if (rise <= reach.height * 1.25) {
+        fail(
+          `${i}. sessiz adım sessiz alansız da çıkılıyor: ${Math.round(rise)}px, ` +
+            `normal zıplama ${Math.round(reach.height)}px`,
+        );
+      }
+      if (rise > quiet.full * BUDGET.rise) {
+        fail(
+          `${i}. sessiz adım sessiz alanda bile çıkılmıyor: ${Math.round(rise)}px, ` +
+            `içeride ${Math.round(quiet.full)}px`,
+        );
+      }
+      if (gap > quiet.distance * BUDGET.jump * 0.6) {
+        fail(`${i}. sessiz adım çok uzak: ${Math.round(gap)}px`);
+      }
+      continue;
+    }
+
+    /**
+     * Riding a slab that hangs on a rope.
+     *
+     * Proved at the two ends of the arc, where the slab is momentarily
+     * stationary, and nowhere else. That is not a shortcut — it is the honest
+     * statement of what the level promises: a player who waits for the swing
+     * to stop can always get on and always get off, so the crossing needs no
+     * timing the player cannot see. Riding through the fast middle is quicker
+     * and much harder, and it is never required.
+     *
+     * The step onto the near end is measured from wherever the climb was
+     * standing; the step off the far end is measured by the ordinary rules,
+     * because this node's own x *is* the far end.
+     */
+    if (b.via === 'swing' && b.swing) {
+      const nearGap = Math.max(
+        0,
+        b.swing.nearX - b.w / 2 > a.x + a.w
+          ? b.swing.nearX - b.w / 2 - (a.x + a.w)
+          : a.x - (b.swing.nearX + b.w / 2),
+      );
+      if (rise > reach.height * BUDGET.rise) {
+        fail(`${i}. sallanan buza çıkılamıyor: ${Math.round(rise)}px yükseliş`);
+      }
+      const allowed = reachAt(scale, Math.max(0, rise)) * BUDGET.jump;
+      if (nearGap > allowed) {
+        fail(
+          `${i}. sallanan buzun yakın ucu çok uzak: ${Math.round(nearGap)}px, ` +
+            `erişim ${Math.round(allowed)}px`,
+        );
+      }
+      // A rope shorter than this reads as a wobble rather than a swing, and a
+      // sweep the penguin can simply jump across is decoration.
+      if (b.swing.period < 0.9) fail(`${i}. sallanan buz fazla hızlı: ${b.swing.period} sn`);
+      const sweep = Math.abs(b.swing.farX - b.swing.nearX);
+      if (sweep < reach.distance * 0.5) {
+        fail(`${i}. sallanan buzun yayı çok kısa: ${Math.round(sweep)}px`);
       }
       continue;
     }
