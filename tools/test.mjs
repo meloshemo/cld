@@ -44,6 +44,9 @@ const NODE_SUITES = [
   ['tests/repeatable.mjs', 'aynı bölüm iki kere'],
   ['tests/checkpoint.mjs', 'kontrol noktası sözü'],
   ['tests/offline.mjs', 'çevrimdışı katman'],
+  ['tests/vent.mjs', 'deniz tabanı bacası'],
+  ['tests/bank.mjs', 'kar siperi'],
+  ['tests/glaze.mjs', 'cam buz'],
   ['tests/economy.mjs', 'ekonomi dengesi'],
   ['tests/ghost.mjs', 'hayalet kodlaması'],
 ];

@@ -8,7 +8,7 @@ istiyor.
 
 **Bağımlılık yok, derleme adımı yok, backend yok, görsel/ses dosyası yok.**
 Penguen de, buz da, kuzey ışıkları da, bütün sesler de kodla üretiliyor.
-Toplam yük tek dosyada 600 KB ve çevrimdışı çalışıyor.
+Toplam yük tek dosyada 619 KB ve çevrimdışı çalışıyor.
 
 ▶ **[Oyunu aç](https://claude.ai/code/artifact/2f6dd29b-3ad8-4d60-b4f7-c8490114b96f)**
 
@@ -343,7 +343,7 @@ geçmez, hata verip durur.
 
 ## Testler
 
-Tek komut, 34 paket (25 node + paketleme + 9 tarayıcı), kendi sunucusunu
+Tek komut, 37 paket (28 node + paketleme + 9 tarayıcı), kendi sunucusunu
 kurup kapatıyor ve portu doluysa bir yanına kayıyor:
 
 ```bash
@@ -583,7 +583,7 @@ boşluk o sayıya göre ölçülüyor.
 - **Sabit adımlı fizik (1/120 s).** 60 Hz, 120 Hz ve 144 Hz ekranlarda oyun aynı
   hissettiriyor; arka planda kalan sekme geri geldiğinde penguen ışınlanmıyor.
 - **Görsel/ses varlığı yok.** Penguen, buzlar, kuzey ışıkları, su ve bütün sesler
-  kodla üretiliyor. Tek dosya sürümü 600 KB ve çevrimdışı çalışıyor.
+  kodla üretiliyor. Tek dosya sürümü 619 KB ve çevrimdışı çalışıyor.
 - **Metin koddan ayrı.** Arayüz metinleri tek sözlükte, içeriğe ait metinler
   girdinin kendi `en` bloğunda. Bir dil eklemek bir tablo eklemek.
 
@@ -846,6 +846,187 @@ setProvider({ available: () => boolean, show: () => Promise<boolean> })
 
 Günlük sınır bir detay değil, tasarımın kendisi: sınırsız bir katlama bonus
 değil ekonominin ta kendisi olurdu, ve ekonomi az önce bilerek yavaşlatıldı.
+
+## Bölümler birbirini tekrar ediyor mu
+
+`tools/variety.mjs` bir kanaati sayıya çeviriyor: her bölümün bestecide
+*hangi fiilleri çağırdığını* okuyup, aynı chapter içinde kelime dağarcığının
+%80'ini paylaşan bölüm çiftlerini sayıyor. İki bölüm kelimelerinin beşte
+dördünü paylaşıyorsa, içlerindeki sayılar ne kadar farklı olursa olsun, tek bir
+fikrin iki düzenlemesidir.
+
+| Chapter | Fiil (önce → sonra) | Tekrar (önce → sonra) |
+|---|---|---|
+| I. Sahanlık (1–31) | 18 | %6 → %6 |
+| II. Zirve (32–46) | 8 → **9** | %15 → **%11** |
+| III. Buz Altı (47–61) | 9 → **10** | %33 → **%23** |
+| IV. Kar Topu (62–76) | 5 → **6** | %16 → **%10** |
+
+Sıralama işi yönlendirdi: en tekrarlı chapter'a yeni bir fiil (baca), en ince
+dağarcıklı chapter'a bir başkası (kar siperi), dağa bir üçüncüsü (cam buz).
+Yeni bir mekanik eklemeden önce ve ekledikten sonra çalıştırılıyor, çünkü "bu
+bölümler aynı geliyor" cümlesi biri sayı üretene kadar bir kanaat.
+
+**I. chapter'a dokunulmadı.** 18 fiil, %6 tekrar — ölçüm "burada yapacak iş
+yok" dedi ve iş yapılmadı. Sağlıklı bir sayıya iyileştirme yapmak, sayıyı
+değil kodu bozar.
+
+### Ölçüm bir kere de beni durdurdu
+
+Cam buzu ilk hâlinde dört bölüme birden koydum. Tekrar oranı **düştü değil,
+yükseldi**: %15'ten %17'ye.
+
+Sebebi ölçüldüğünde bariz. Metrik Jaccard: iki bölüm kelimelerinin beşte
+dördünü paylaşıyorsa ikizler. Bir bölüm başka bir bölüm **artı bir kelimeyse**
+hâlâ 5/6 = 0,83 ikizdir; ve aynı yeni kelimeyi tutan dört bölüm birbirinin
+aynısı olur. Yeni bir oyuncak dağıtmak bölümleri birbirine benzetiyor.
+
+Ayırt edicilik oyuncakta değil, **birleşimde**. Bütün yerleşimleri tarayınca
+(dört aday bölüm × iki nadir fiil) en iyi düzen çıktı: **37. bölüm ikisini
+birden alıyor** — düz duvar *ve* cam buz, çıkıntının altında — ve chapter %11'e
+iniyor. İki nadir kelimeyi tek bölümde üst üste koymak, bir kelimeyi dört
+bölüme yaymaktan iyi.
+
+| Düzen | Tekrar |
+|---|---|
+| Hiç değişmemiş | 16/105 (%15) |
+| Cam buz dört bölüme yayılmış | 15/105 (%14) |
+| **Cam buz + düz duvar 37'de, cam buz 36'da** | **12/105 (%11)** |
+
+Ve bir yerde de kanıt "hayır" dedi. **41. Cilalı Sırt** cam buz için mükemmel
+bir aday: adı Cilalı Sırt, alt başlığı "ayak tutmuyor", ve bu şimdiye kadar
+yalnızca zeminle ilgiliydi. Aynı zamanda chapter'ın en zor tırmanışı (effort
+0,962), her yatay geçişin altında cilalı buz var, ve çözücü iki duvarda da her
+yükseklikte bandı reddetti. Bu bölümde geri alamayacağın bir hamle için
+kalmış dayanma gücü yok. Bir bölümün ödeyemediği iyi fikir, o bölüm için iyi
+fikir değil.
+
+## Cam buz: geri dönüşü olmayan hamle
+
+Dağın sekiz fiili, *ne kadar tutunabilirsin* sorusunun sekiz sorulma biçimi:
+bir duvar, bir baca, bir yatay geçiş, sallanan bir buz, bir fırtına. Ortak
+noktaları cevap değil — dağdaki **her hamlenin yarıda bırakılabilmesi**.
+Tutunuyorsun, düşünüyorsun, biraz kayıyorsun, gidiyorsun.
+
+Chapter'ın **kararlılık** diye bir kelimesi yoktu.
+
+Cam buz, duvarın orada olması ve tutulacak hiçbir şeyin olmaması. Tek bir
+duvarda bu sadece ortasında delik olan bir duvar olurdu — banda tırmanırsın,
+tutuş gider, düşersin — o yüzden **bacaya** konuyor, karşıda başka bir duvar
+varken. Bandın yüksekliğini karşı tarafta tek seferde kazanman gerekiyor, ve bu
+dağdaki geri alamayacağın tek hamle: ortasında duramazsın, çünkü ortası
+tutmayan kısım.
+
+İki inşa-zamanı reddi, ikisi de aritmetik: bant tek bir tırmanıştan kısa olmalı
+(yoksa karşı taraf kapatamaz ve baca çıkmaz sokak olur) ve bacanın ağzıyla
+tepesi arasına sığmalı (yoksa bant değil, kısa bir bacadır).
+
+**Ve kanıtın bunu hissetmesi gerekiyordu.** `climb-run.mjs` gerçek `Player`'ı
+sürüyor ama niyeti kendisi kuruyor — üstelik dört ayrı çağrı yerinde. Dördü de
+sessizlik bölgesi için `gravity` geçirmeyi hatırlıyordu; üçü ikinci bir bölge
+türünden habersizdi. Bir commit boyunca bu çözücünün pengueni, oyuncunun
+pengueninin tutunamayacağı bir duvara tutunabiliyordu, ve iki bölümü kimsenin
+yapamayacağı bir hamleyle "tırmanılabilir" ilan etti. Oyundan güçlü olmasına
+izin verilen bir kanıt hiçbir şeyin kanıtı değil. Niyet artık tek bir
+fonksiyonda kuruluyor, ki bir sonraki bölge bir kere bağlansın.
+
+## Kar siperi: süresi olan siper
+
+Chapter dört, on beş bölüm için beş kelimeye sahipti — oyundaki en ince
+dağarcık — ve beşi de tek bir fikrin düzenlemesiydi: *hiçbir şeyin sana hattı
+olmayacağı yer neresi*. Kaya sütunu bu sorunun cevabı, ve oyuncu bir sütun
+bulduğunda bölüm yürümek dışında bitmiş oluyor.
+
+Kar siperi, üstünde saat olan bir sütun — ve saati sana atanlar kuruyor. Üç
+isabet ve yerde kar oluyor. Yani bölümün en güvenli yeri, tükenmekte olan yer.
+Saklanmak bir çözüm değil, bir kaynak. Chapter nihayet kamp yapmaya "siperi
+kaldırdık" olmayan bir cevap veriyor.
+
+Üç şeyin doğru olması gerekiyor, ve ikisi yolda kırıldı:
+
+**Yalnızca zaman verebilir.** Katı yapıldığında aynı zamanda bir duvardı, ve
+iki duruş noktası arasındaki yürüyüşün zaten kaçış penceresine göre ayarlandığı
+bir bölümde, o yürüyüşün ortasındaki bir duvar kazanılabilir bir arenayı
+kazanılamaz hâle getirdi. Artık gevşek kar: kar topu içine gömülüyor, penguen
+içinden geçiyor.
+
+**Asla cevabın üstünde durmaz.** Bu chapter'ın bilmecesi, oyuncunun atacak
+hiçbir şeyi olmaması: *sana* atılan bir topun başka bir rakibin içinden geçtiği
+yere duruyorsun ve işi onlara bıraktın. O hatlardan birinin üstündeki bir siper
+demek, topun kara saplanması ve kimsenin devrilmemesi demek. İlk sürüm bunu
+**henüz kurulmamış** bir plana karşı denetliyordu (`duel()` yalnızca istek
+kaydediyor; atıcılar `build()` içinde yerleşiyor), iki bölümde siperi tam
+duruş noktasının üstüne bıraktı, ve bestecideki her kuralı geçti.
+
+**Ölünce geri gelir**, yoksa siperin arkasında ölen oyuncu kendisine verilenden
+daha az siperli bir bölüme dirilirdi.
+
+Hangi bölümler: **64 Tepedeki** (oyundaki ilk siper, konusu hiç durmadan sana
+atan biri olan bölümde — arkasına geçmek bariz hamle ve yanlış olanı), **71 Dört
+Kapı** (üç atışlık tek bir nefes alma yeri), **74 Aynı Anda** (herkesin aynı
+vuruşta attığı bölümde iki siper: burada siper aşınmıyor, yıkılıyor — siper
+başına bir yaylım).
+
+Ölçüm sonrası: arena chapter'ının tekrarı **%16 → %10**, fiil sayısı 5 → 6.
+
+## Deniz tabanındaki baca: denizin "ne zaman"ı
+
+`tools/variety.mjs` bir kanaati sayıya çevirdi ve sayı acıtıcıydı: dalış
+chapter'ı oyundaki en tekrarlı bölümdü. Aynı chapter içindeki her üç bölüm
+çiftinden biri, kelime dağarcığının %80'ini paylaşıyordu.
+
+Sebep tembel besteleme değildi. Sebep şuydu: on beş bölümün hepsi **tek bir
+soruyu** soruyordu — *bir sonraki deliğe ne kadar hızlı varırsın*. Geometri,
+deniz leoparı, akıntı ve soğuk çukur; bunu zorlaştırmanın dört yolu, ve
+hiçbiri farklı bir soru değil.
+
+Denizin **"ne zaman"** diye bir kelimesi yoktu. Orada hiçbir şeyin saati yok;
+sadece elinden geldiğince hızlı yüzüyorsun, on beş bölüm boyunca.
+
+Baca bunun cevabı. Buzdaki delik gibi hava veriyor, ama sadece **üflerken**,
+ve döngüsünün beşte ikisinde üflüyor. Üstüne daha hızlı yüzmek hiçbir şey
+yapmıyor. Varıyorsun, ve bekliyorsun. Beklemek de yüzmekle tam olarak aynı
+şeye mal oluyor, çünkü burada her şeyin bedeli aynı ciğerden ödeniyor.
+
+Ve **tabanda**. Bu chapter'da hava ilk bölümden beri tavanda, ve ona doğru
+yükselmek penguenin sahip olduğu tek bedava şey; aşağı inmek tuşa basmayı
+gerektiriyor. Bir baca, ekranda olduğu sürece chapter'ın bütün geometrisini
+baş aşağı çeviriyor.
+
+**Sırtın üstünde, tabanda değil.** İlk hâli tabandaydı ve yanlıştı: buzun
+hemen altındaki hattan dört yüz piksellik bir iniş, ve bu chapter her dalışı
+gerçekten mal olduğu yatay mesafe olarak fiyatlandırdığı için, beklemek daha
+başlamadan bir ciğerin çoğu gidiyordu. Besteci oyundaki **her** yerleşimi
+reddetti. Şimdi çatlak, tabandan yükselen bir kaya sırtında.
+
+| Sayı | Değer | Neden |
+|---|---|---|
+| Döngü | 3,6 sn | 4,2'de en kötü bekleme 2,8 sn'ydi — bir ciğerin üçte biri — ve baca yalnızca havanın hemen ardına konabiliyordu, ki bir bacanın anlamsız olduğu tek yer orası |
+| Üfleme payı | 0,42 | En kötü bekleme 2,09 sn: karar olacak kadar uzun, bir yere sığacak kadar kısa |
+| Doldurma hızı | ×1,5 | Cömert görünüyor, değil. Üfleme bir buçuk saniye sürüyor ve açılıp sönüyor, yani altındaki *alan* zirvesinin yaklaşık yedide yedisi. Besteci bacayı bir nefes olarak fiyatlandırıyor — ciğeri delik gibi sıfırlıyor — ve bunun **doğru** olması gerekiyor. 0,78'de bir üfleme seni 9,5'ten 8'e getiriyordu, ve aritmetiği "dolu" derken suyun "tam değil" dediği bir besteci, bu projenin iki kere kazıp çıkardığı her hatanın şekli |
+
+Hangi bölümler: **53 Testere Dişi** (yukarı-aşağı-yukarı: testerenin dibi
+nihayet gidilmeye değer bir yer), **54 Buzul Karnı** (tavanın hiç yükselmediği
+bölümde hava yukarıda olmayı bırakıyor), **58 Kılçık** (bölümün notu "hiç
+dinlenecek yer yok" diyor; artık tek dinlenme var ve kira istiyor).
+
+Ölçüm sonrası: dalış chapter'ının tekrarı **%33 → %23**.
+
+### Ve bu arada ortaya çıkan bir yalan
+
+**57. bölümün adı "İki Ciğer".** `breathRange` ile ölçünce geçişi *bir*
+ciğerin 0,99'uydu. Ortasında isteğe bağlı bir delik ve hattın üstünde, yüzüşü
+kısaltan tek eşya olan bir hız balığı olan tek ciğerlik bir bölümdü. Yazıldığı
+günden beri öyleydi ve hiçbir şey göremezdi, çünkü chapter'daki her kural bir
+stretch'in yeterince **kısa** olduğunu denetliyor ve hiçbiri bir bölümün adını
+hak edecek kadar **uzun** olduğunu denetlemiyor. Bütçe yükseldi, kestirme
+gitti: şimdi 1,40 ciğer.
+
+`tests/vent.mjs` neyi tutuyor: üfleme eğrisinin sözleşmesi, tek üflemenin
+gerçekten bir nefes ettiği, sessizken hava vermediği, **on ayrı fazın hepsinde**
+bölümün bitirilebildiği (adalet iddiası bu — tek bir faza güvenmek değil), ve
+bacanın süs olmadığı — yani bölümün, hiç ona uğramadan geçilemeyecek kadar
+uzun olduğu.
 
 ## Çukur: derinliğin bedeli
 
@@ -1775,6 +1956,35 @@ genişliği yok, orada da düğmeler tek sıraya geçiyor ve sayılar sıkışı
 koşuyor. Listelerde (market, bölüm listesi) kaydırma tasarımın kendisi, orada
 şart koşmuyor: kartta kaydırmak zorunda kalmak, kartın sığmaması demek.
 
+### Market: dokuz düz dikdörtgenden bir vitrine
+
+Marketteki her şey doğruydu ve hiçbiri bakmaya değmiyordu — ki oyuncunun
+*açmak isteyeceği* ekran için tuhaf bir durum. Yeniden kurgu daha çok renk
+değil; **durum, derinlik ve tek bir vurgu**:
+
+- Her kart bir cam levha: üstünden geçen bir parlaklık, üst kenarında bir
+  kıl payı ışık, altında bir gölge. Sayfaya *basılmış* olmak yerine sayfanın
+  üstünde duruyor.
+- Üç durum üç ayrı şeye benziyor. **Alınabilir**: kenarı yanıyor, arkasında
+  vurgu rengi bir hâle var, ekranın öbür ucundan ilk o okunuyor. **Uzak**:
+  soğumuş, ve üstünde ne kadar yaklaştığını gösteren bir çubuk taşıyor.
+  **Bitmiş**: nane yeşili ve mühürlü.
+- Seviyeler üç nokta değil bir ray: kazanılan bölmeler yanıyor, bir sonraki
+  nefes alıyor — karttaki tek animasyon, ve karttaki tek düğmeyi işaret ediyor.
+- Grup başlıkları bir sayı yerine bir ölçü taşıyor. "3/8" okunacak bir gerçek;
+  üçte biri dolu bir çubuk, doldurduğun bir raf.
+- Cüzdan artık altın bir nesne: üstten ışıklı, altta gömük, kenarının içinde
+  bir halka. Oyunda oyuncunun yükselişini izlediği tek sayı bu.
+
+Altın yalnızca paraya, nane yalnızca "tamam"a ayrılmış durumda. Dokuz kartlı
+bir ekranın kumar makinesine dönüşmesini engelleyen tek şey bu.
+
+"240 balık daha" ise kafanda tutup gidip fiyata bakman gereken bir sayıydı;
+neredeyse dolmuş bir çubuk bir **his**, ve bu ekrana insanı geri getiren şey o
+his. Bu arada `buildShop()` artık cüzdanı da tazeliyor: kartlar keseyi
+okuyorken köşedeki jetonun başka bir yerde doldurulması, ikisinin aynı ekranda
+farklı sayı göstermesinden bir tazeleme uzaktı.
+
 ### Market
 
 Dokuz kart, hepsi tam genişlikte parlak bir "Al" düğmesiyle: hepsi aynı sesle
@@ -2047,11 +2257,11 @@ anlatmak değil, olan bir şeyi olduğundan iyi anlatmaktır.
 | Kimlik | Ad, `PNG-XXXXX` kimliği, 7 unvan, hepsi cihazda |
 | Hayalet | Kendi rekorun yanında koşuyor, paylaşım koduyla arkadaşınki de |
 | Müzik | Tek tema, 5 sahne, 5 katman, ses saatinde planlanıyor, ses dosyası yok |
-| Dil | Türkçe ve İngilizce, 304 metin, tarayıcıdan seçiliyor |
+| Dil | Türkçe ve İngilizce, 307 metin, tarayıcıdan seçiliyor |
 | Kayıt | Tek sürümlü JSON, ileri göç, dosyaya aktarma, tek tuşla silme |
-| Çevrimdışı | Servis çalışanı + tek dosya sürümü (600 KB) |
+| Çevrimdışı | Servis çalışanı + tek dosya sürümü (619 KB) |
 | Girdi | Klavye, dokunmatik, gamepad |
-| Test | 25 node + paketleme + 9 tarayıcı paketi, hepsi tek komutta |
+| Test | 28 node + paketleme + 9 tarayıcı paketi, hepsi tek komutta |
 | Zorluk | Ölçülen eğri: `node tools/difficulty.mjs` |
 
 ### Yok, ve neden

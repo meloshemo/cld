@@ -12,7 +12,7 @@ import { Player } from './player.js';
 import { GhostRecorder, Ghost } from './ghost.js';
 import {
   VIEW, VIEW_LIMITS, ASSIST, ICE, STORM, WIND, SWIM, BRAWL, BOOST, CHARGED, ROT, REWARDS, AMBUSH, COLLAPSE, HUSH,
-  hushAt, trenchDrainAt, scaleForLevel, upgradeEffect, hazardPhase,
+  hushAt, glazeAt, trenchDrainAt, scaleForLevel, upgradeEffect, hazardPhase, ventAt, VENT,
 } from './config.js';
 import { WATER_Y } from './levels.js';
 import { getSkin } from './skins.js';
@@ -101,9 +101,32 @@ export class World {
       dx: 0,
       dy: 0,
     }));
+    /**
+     * Snow banks: cover the other side shoots away. See `BANK`.
+     *
+     * Loose snow, not ice. A snowball buries itself in one; a penguin bellies
+     * through it. That is not a softening — it is what keeps the promise the
+     * mechanic is built on, that a bank can only ever *give* the player time.
+     * Made solid, it was also a wall: it stood between two stand-spots on a
+     * level where the walk between them is already timed to the dodge window,
+     * and the arena went from winnable to not because somebody added cover.
+     */
+    this.banks = (def.banks ?? []).map((d) => ({
+      ...d,
+      type: 'bank',
+      bank: true,
+      gone: false,
+      left: d.hits ?? 3,
+      hit: 0,
+    }));
     /** What the player actually collides with. Built once; holds references. */
     this.solids = [...this.floes, ...this.terrain];
     this.zones = def.zones ?? [];
+    /**
+     * Cracks in the seabed that breathe. Air, but only when it is blowing.
+     * See `VENT` — this is the chapter's only clock.
+     */
+    this.vents = (def.vents ?? []).map((v) => ({ ...v, blow: 0 }));
     /** Which penguin is being worn — the renderer reads it every frame. */
     this.skinId = deps.skin ?? 'normal';
     /** And what it leaves behind. */
@@ -456,6 +479,7 @@ export class World {
       },
     };
     if (this.shieldFlash > 0) this.shieldFlash = Math.max(0, this.shieldFlash - dt);
+    for (const b of this.banks) if (b.hit > 0) b.hit = Math.max(0, b.hit - dt * 3);
 
     for (const f of this.floes) {
       f.update(wdt, this.time, fx);
@@ -578,7 +602,11 @@ export class World {
       }
     }
 
-    this.player.update(dt, { ...intent, push, lift, gravity: this.hushed || 1 }, this.solids, this.tuning, {
+    // Glare ice, read at the hands rather than at the feet: what decides
+    // whether a grip lands is where the grip would be.
+    const grip = glazeAt(this.zones, this.player.centerX, this.player.y + this.player.h * 0.4) ? 0 : 1;
+    if (!grip) this._tell('glaze', t('world.glaze'), 2);
+    this.player.update(dt, { ...intent, push, lift, grip, gravity: this.hushed || 1 }, this.solids, this.tuning, {
       onJump: (wound) => {
         if (wound) {
           this.audio.uncoil?.();
@@ -702,6 +730,26 @@ export class World {
           return;
         }
 
+        // A bank eats the shot and is a little less of a bank for it. The
+        // cover on this level is being taken down by the people using it
+        // against you, which is the only clock this chapter has.
+        for (const f of this.banks) {
+          if (f.gone || !rectsOverlap(box, f)) continue;
+          f.left--;
+          f.hit = 1;
+          this.shake(3);
+          this.particles.burstIce(b.x, b.y, 10, 12);
+          if (f.left <= 0) {
+            f.gone = true;
+            this.particles.burstIce(f.x + f.w / 2, f.y + f.h / 2, 20, f.w / 2);
+            this.audio.shatter();
+            this._tell('bank', t('world.bank'), 2);
+          }
+          stopped = true;
+          break;
+        }
+        if (stopped) break;
+
         for (const f of this.solids) {
           if (f.state === 'gone' || f.state === 'melted') continue;
           if (!rectsOverlap(box, f.box ?? f)) continue;
@@ -742,6 +790,27 @@ export class World {
       inAir = true;
       hole.glow = 1;
     }
+    /*
+     * A vent gives air the way a hole does, and takes a clock to do it.
+     *
+     * Deliberately the same branch as the ice: once you are breathing, the
+     * game should not care which of the two you found. What differs is that
+     * this one is only there part of the time, and that difference is the
+     * whole point of it — so the column's strength is read from the shared
+     * `ventAt`, the same curve the renderer draws and the validator prices.
+     */
+    let ventFill = 0;
+    for (const v of this.vents) {
+      v.blow = ventAt(v.period, v.phase, this.time);
+      if (!rectsOverlap(head, v)) continue;
+      // Said the first time a player is standing in a silent column, which is
+      // the exact moment the mechanic looks broken: you have swum down to the
+      // air and there is no air. One line, once, and never again.
+      this._tell('vent', t('world.vent'), 2.2);
+      if (v.blow <= 0.02) continue;
+      inAir = true;
+      ventFill = Math.max(ventFill, v.blow);
+    }
     p.breathing = inAir;
     /**
      * Worked out before the early return, not after it.
@@ -761,7 +830,10 @@ export class World {
     if (this.drain > 1.15) this._tell('trench', t('world.trench'), 2);
     if (inAir) {
       const before = p.breath;
-      p.breath = Math.min(p.breathMax, p.breath + SWIM.refill * dt);
+      // A crack in a rock is a thinner gasp than a hole in the ice, and it
+      // fades at both ends of a blow rather than switching on.
+      const rate = ventFill > 0 ? SWIM.refill * VENT.rate * ventFill : SWIM.refill;
+      p.breath = Math.min(p.breathMax, p.breath + rate * dt);
       // One bubble-burst per gasp, at the moment the lungs actually fill,
       // rather than a stream the whole time a player idles in a hole.
       if (before < p.breathMax * 0.999 && p.breath >= p.breathMax * 0.999) {
@@ -1071,6 +1143,14 @@ export class World {
     for (const r of this.rivals) r.reset();
     this.snowballs.length = 0;
     this.brawlKnockouts = 0;
+    // The banks come back too. A player who dies behind a bank they had spent
+    // would otherwise respawn into a level with less cover than the one they
+    // were given, which is a difficulty curve nobody chose.
+    for (const b of this.banks) {
+      b.gone = false;
+      b.left = b.hits ?? 3;
+      b.hit = 0;
+    }
     // Speed fish come back on a retry; the normal three stay taken so a death
     // never costs you collectibles you already earned this run.
     for (const f of this.boosts) f.reset();

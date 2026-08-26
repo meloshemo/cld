@@ -9,7 +9,8 @@
  */
 
 import {
-  VIEW, viewFor, AMBUSH, CHARGED, COIL, QUANTUM, SLACK, CLIMB, BRAWL, TRENCH, lobShot,
+  VIEW, viewFor, AMBUSH, CHARGED, COIL, QUANTUM, SLACK, CLIMB, BRAWL, TRENCH, VENT, BANK, GLAZE,
+  lobShot,
 } from './config.js';
 import { getSkin, getTrail } from './skins.js';
 import { t } from '../core/i18n.js';
@@ -238,7 +239,9 @@ export class Renderer {
     ctx.save();
     ctx.translate(-camX, -camY);
     this._terrain(ctx, world, time);
+    this._banks(ctx, world, time);
     if (world.diving) this._airHoles(ctx, world, time);
+    if (world.diving) this._vents(ctx, world, time);
     this._zonesBack(ctx, world, time);
     this._signs(ctx, world);
     this._floes(ctx, world, time);
@@ -354,6 +357,174 @@ export class Renderer {
       ctx.fillStyle = 'rgba(236,252,255,0.85)';
       ctx.fillRect(hole.x - 10, y - 6, 12, 8);
       ctx.fillRect(hole.x + hole.w - 2, y - 6, 12, 8);
+    }
+  }
+
+  /**
+   * The cracks in the seabed that breathe.
+   *
+   * Drawn from `ventAt` — the same curve the water reads and the validator
+   * prices — so the column a player is timing their dive against is the column
+   * that is actually giving air. Three things have to be legible from a
+   * distance: that it is there when it is silent, that it is *about* to blow,
+   * and that it is blowing now.
+   */
+  _vents(ctx, world, time) {
+    const view = this._viewBounds(world);
+    for (const v of world.vents ?? []) {
+      if (v.x + v.w < view.left || v.x > view.right) continue;
+      const strength = v.blow ?? 0;
+      const mouthY = v.y + v.h;
+      const cx = v.x + v.w / 2;
+
+      // The mouth. Always visible, so a silent vent is still a landmark.
+      ctx.fillStyle = 'rgba(10,26,44,0.85)';
+      ctx.beginPath();
+      ctx.ellipse(cx, mouthY, v.w * 0.42, 7, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = withAlpha(VENT.tint, 0.35 + strength * 0.5);
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      if (strength <= 0.02) {
+        // Silent, but stirring: a few grains lifting off the lip say the crack
+        // is alive and worth waiting on, without promising air that is not
+        // coming yet.
+        if (!this.reducedMotion) {
+          ctx.fillStyle = withAlpha(VENT.tint, 0.22);
+          for (let i = 0; i < 3; i++) {
+            const t = (time * 0.5 + i * 0.33) % 1;
+            ctx.beginPath();
+            ctx.arc(cx + Math.sin(t * 6 + i) * 9, mouthY - t * 26, 1.6, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+        continue;
+      }
+
+      // The column.
+      const h = v.h * (0.35 + strength * 0.65);
+      const g = ctx.createLinearGradient(0, mouthY, 0, mouthY - h);
+      g.addColorStop(0, withAlpha(VENT.tint, 0.4 * strength));
+      g.addColorStop(0.55, withAlpha(VENT.tint, 0.2 * strength));
+      g.addColorStop(1, withAlpha(VENT.tint, 0));
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.moveTo(cx - v.w * 0.34, mouthY);
+      ctx.lineTo(cx - v.w * 0.62, mouthY - h);
+      ctx.lineTo(cx + v.w * 0.62, mouthY - h);
+      ctx.lineTo(cx + v.w * 0.34, mouthY);
+      ctx.closePath();
+      ctx.fill();
+
+      // Bubbles, rising on their own clock so the column has grain rather than
+      // being a beam of light with a gradient on it. Enough of them that the
+      // thing reads as *air* from across the screen, because deciding to swim
+      // down to it is a decision made from across the screen.
+      const n = Math.round(26 * strength) + 6;
+      for (let i = 0; i < n; i++) {
+        const seed = i * 2.399 + v.x * 0.013;
+        const rise = ((time * (0.62 + (i % 5) * 0.13) + seed) % 1);
+        const y = mouthY - rise * h;
+        // They spread as they climb, the way a plume does.
+        const spread = 0.12 + rise * 0.5;
+        const wob = Math.sin(rise * 6.5 + seed * 3.1) * v.w * spread;
+        const r = 1.4 + (i % 5) * 0.8 * strength * (1 - rise * 0.35);
+        const fade = Math.sin(Math.min(1, rise * 1.35) * Math.PI) * 0.9 + 0.1;
+        ctx.fillStyle = withAlpha('#eaffff', fade * 0.7 * strength);
+        ctx.beginPath();
+        ctx.arc(cx + wob, y, r, 0, Math.PI * 2);
+        ctx.fill();
+        // A highlight on the bigger ones, so they are bubbles and not dots.
+        if (r > 2.4) {
+          ctx.fillStyle = withAlpha('#ffffff', fade * 0.5 * strength);
+          ctx.beginPath();
+          ctx.arc(cx + wob - r * 0.3, y - r * 0.3, r * 0.34, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      // A hard glow at the mouth while it is blowing: the source of the thing.
+      const mg = ctx.createRadialGradient(cx, mouthY, 2, cx, mouthY, v.w * 0.7);
+      mg.addColorStop(0, withAlpha('#dffcff', 0.5 * strength));
+      mg.addColorStop(1, withAlpha('#dffcff', 0));
+      ctx.fillStyle = mg;
+      ctx.fillRect(cx - v.w * 0.7, mouthY - v.w * 0.7, v.w * 1.4, v.w * 1.4);
+    }
+  }
+
+  /**
+   * Snow banks: cover with a lifespan.
+   *
+   * The one thing that has to be readable without a legend is how much of it
+   * is left, because that is the decision — stay here or move now. So a bank
+   * physically loses height and gains bite marks as it is shot away, rather
+   * than carrying a number or a bar. Three hits, three shapes.
+   */
+  _banks(ctx, world, time) {
+    const view = this._viewBounds(world);
+    for (const b of world.banks ?? []) {
+      if (b.gone || b.x + b.w < view.left || b.x > view.right) continue;
+      const left = Math.max(0, b.left) / Math.max(1, b.hits ?? 3);
+      const h = b.h * (0.42 + left * 0.58);
+      const top = b.y + b.h - h;
+      const flash = b.hit ?? 0;
+
+      ctx.save();
+      // The heap. Rounded, and lower on the side the shots came from.
+      const g = ctx.createLinearGradient(0, top, 0, b.y + b.h);
+      g.addColorStop(0, shade(BANK.tint, 1 + flash * 0.4));
+      g.addColorStop(1, shade(BANK.tint, 0.72));
+      ctx.fillStyle = g;
+      // A drift, not a tooth: the foot spreads well past the box on both sides
+      // so it sits *on* the ice instead of standing up out of it.
+      const foot = b.w * 0.3;
+      ctx.beginPath();
+      ctx.moveTo(b.x - foot, b.y + b.h);
+      ctx.bezierCurveTo(
+        b.x + b.w * 0.02, b.y + b.h - 6,
+        b.x + b.w * 0.1, top + 2,
+        b.x + b.w * 0.4, top,
+      );
+      ctx.bezierCurveTo(
+        b.x + b.w * 0.66, top + (1 - left) * 7,
+        b.x + b.w * 0.94, b.y + b.h - h * 0.55,
+        b.x + b.w + foot, b.y + b.h,
+      );
+      ctx.closePath();
+      ctx.fill();
+
+      // The shaded flank, so it has a lit side and a cold one.
+      ctx.fillStyle = withAlpha('#9dc4de', 0.28);
+      ctx.beginPath();
+      ctx.moveTo(b.x + b.w * 0.4, top);
+      ctx.bezierCurveTo(
+        b.x + b.w * 0.66, top + (1 - left) * 7,
+        b.x + b.w * 0.94, b.y + b.h - h * 0.55,
+        b.x + b.w + foot, b.y + b.h,
+      );
+      ctx.lineTo(b.x + b.w * 0.42, b.y + b.h);
+      ctx.closePath();
+      ctx.fill();
+
+      // Bites out of the face, one per hit taken.
+      const taken = (b.hits ?? 3) - Math.max(0, b.left);
+      ctx.fillStyle = withAlpha('#8fb6d4', 0.35);
+      for (let i = 0; i < taken; i++) {
+        const t = 0.26 + i * 0.24;
+        ctx.beginPath();
+        ctx.arc(b.x + b.w * t, top + 10 + (i % 2) * 16, 9 - i, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // A packed crest, so it reads as snow somebody piled up rather than ice.
+      ctx.strokeStyle = withAlpha('#ffffff', 0.5 + flash * 0.4);
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(b.x + b.w * 0.1, top + 6);
+      ctx.quadraticCurveTo(b.x + b.w * 0.4, top - 1, b.x + b.w * 0.88, top + 8);
+      ctx.stroke();
+      ctx.restore();
     }
   }
 
@@ -830,6 +1001,60 @@ export class Renderer {
     for (const z of world.zones) {
       if (z.x + z.w < view.left || z.x > view.right) continue;
       const h = z.bottom - z.top;
+
+      if (z.kind === 'glaze') {
+        /*
+         * Verglas. It has to read as *the same wall, wet* — not as a hole and
+         * not as a hazard. A player who sees a gap will try to climb through
+         * it; a player who sees a sheen will understand there is nothing to
+         * hold before they commit, which is the only warning this thing gets
+         * to give and the whole reason it is fair.
+         */
+        ctx.save();
+        const wall = z.face ?? (z.side < 0 ? z.x : z.x + z.w);
+        /*
+         * Hugging the wall, not filling the shaft.
+         *
+         * The zone is much wider than the ice because it is read at the
+         * penguin's middle, which is out in the gap. Painting the whole zone
+         * put a pane of haze across the shaft and read as something hanging in
+         * mid-air — the one thing it must not look like, because a player who
+         * sees an object will try to land on it. The sheen dies within about a
+         * body's width of the face.
+         */
+        const bleed = Math.min(z.w, 34);
+        const off = z.side < 0 ? bleed : -bleed;
+        const g = ctx.createLinearGradient(wall + off, 0, wall, 0);
+        g.addColorStop(0, withAlpha(GLAZE.tint, 0));
+        g.addColorStop(0.5, withAlpha(GLAZE.tint, 0.12));
+        g.addColorStop(1, withAlpha(GLAZE.tint, 0.42));
+        ctx.fillStyle = g;
+        ctx.fillRect(Math.min(wall, wall + off), z.top, bleed, h);
+
+        // Meltwater runnels down the face, so it is visibly *wet* ice.
+        ctx.strokeStyle = withAlpha('#eafcff', 0.4);
+        ctx.lineWidth = 1.5;
+        for (let i = 0; i < 5; i++) {
+          const rx = wall + (z.side < 0 ? -4 - i * 5 : 4 + i * 5);
+          const drift = this.reducedMotion ? 0 : Math.sin(time * 1.4 + i * 1.7) * 2;
+          ctx.beginPath();
+          ctx.moveTo(rx + drift, z.top + 4 + (i % 3) * 5);
+          ctx.lineTo(rx - drift, z.bottom - 4 - (i % 2) * 7);
+          ctx.stroke();
+        }
+
+        // A bright lip top and bottom: where the holding stops and starts.
+        ctx.strokeStyle = withAlpha('#ffffff', 0.55);
+        ctx.lineWidth = 2;
+        for (const y of [z.top, z.bottom]) {
+          ctx.beginPath();
+          ctx.moveTo(z.side < 0 ? wall - 20 : wall, y);
+          ctx.lineTo(z.side < 0 ? wall : wall + 20, y);
+          ctx.stroke();
+        }
+        ctx.restore();
+        continue;
+      }
 
       if (z.kind === 'tunnel') {
         ctx.save();
