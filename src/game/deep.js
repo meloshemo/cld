@@ -26,7 +26,7 @@
 
 import {
   PENGUIN, SWIM, swimReach, breathRange, breathFor, swimCost, TRENCH, CHARGED,
-  VENT, ventWait, swimSpeed,
+  VENT, ventWait, swimSpeed, CURRENT, flowAt, FLUME,
 } from './config.js';
 import { nudgeClear } from '../core/util.js';
 
@@ -104,6 +104,8 @@ export class Deep {
     this.lastAir = 0;
     /** Cracks in the seabed that breathe. */
     this.vents = [];
+    /** Bands of moving water still growing with the corridor. */
+    this._flows = [];
   }
 
   /* --------------------------------------------------------- geometry */
@@ -148,6 +150,38 @@ export class Deep {
       kind: 'bed',
     });
     this.x += len;
+    this._growFlow();
+  }
+
+  /**
+   * Stretch the open band of moving water over the corridor just laid.
+   *
+   * A current has to be as long as the swim it is supposed to make hard. Given
+   * a fixed width it was 320 pixels of a six thousand pixel level — a shove on
+   * the way past rather than a passage — which is a large part of why two
+   * levels named after the sea moving felt like the levels where it does not.
+   *
+   * It matters that this happens *as* the corridor is laid rather than after.
+   * `swimSince` prices the route by reading the zones underneath it, and it is
+   * consulted after every piece to decide whether another one fits; a band
+   * whose width arrived at the end would be measured by nothing.
+   */
+  _growFlow() {
+    for (const z of this._flows ?? []) z.w = Math.max(0, Math.round(this.x - z.x));
+  }
+
+  /**
+   * Moving water stops where the air is.
+   *
+   * A hole in the ice is the one thing this chapter promises, and a breath you
+   * have to fight the sea for is not a promise. A vent is deliberately *not*
+   * on this list: its air is on the seabed, and standing still over it while a
+   * current tries to take you off it is the entire point of the one level that
+   * does it.
+   */
+  _closeFlow() {
+    this._growFlow();
+    this._flows = [];
   }
 
   /**
@@ -158,6 +192,7 @@ export class Deep {
    * come up through the hole, your head is in the air, and there you stop.
    */
   _lid(x, w) {
+    this._closeFlow();
     this.terrain.push({
       x: Math.round(x),
       y: -SHELL - 24,
@@ -296,6 +331,63 @@ export class Deep {
   }
 
   /**
+   * What a pixel of corridor costs in air right here, as a multiple of one.
+   *
+   * `swimSince` prices the route through `swimCost`, which reads the zones
+   * under it, so everything compared against `swimSince` has to be in the same
+   * currency. The reserves were not: they are lengths of corridor a surfacing
+   * piece will need, worked out from geometry, and geometry does not know the
+   * water is moving. So a stretch inside an upstream band kept back the right
+   * number of *pixels* and the wrong number of *seconds*, and the piece that
+   * ended it came in ninety pixels over a lungful.
+   *
+   * The route is laid left to right, so the heading is always downstream-positive
+   * and the sign of the band is the sign of the trouble.
+   */
+  get flowDrag() {
+    return this.flowDragTo(this.lane, 40);
+  }
+
+  /**
+   * The worst water anywhere between two depths, as a cost multiplier.
+   *
+   * Read at a single point this was wrong in the way that matters. A band
+   * fills part of the column, and a stretch can be running along below it
+   * while the piece it is reserving for — the rise to the ice — goes straight
+   * up through it. The line was in still water, the reserve said so, and the
+   * swim out was charged one and three quarter times. So the reserve is taken
+   * over the whole column the surfacing will cross, at its worst point.
+   */
+  flowDragTo(from, to) {
+    const a = Math.min(from, to);
+    const b = Math.max(from, to);
+    const cost = (along) => 1 / Math.max(1 - CURRENT.max, 1 + along);
+    let worst = 1;
+    /**
+     * An open band is asked directly, never by a point test.
+     *
+     * It grows with the corridor, so anything laid from here on is inside it
+     * by construction — but its right edge is `this.x` rounded to a whole
+     * pixel, and `this.x` is not whole. Sampling the geometry at the cursor
+     * therefore asks the question exactly *on* the edge, and the answer flips
+     * with the fractional part: at .6 the cursor is inside the band and the
+     * reserve is charged, at .4 it is outside and the reserve is free. Same
+     * level, same code, two different corridors depending on a rounding that
+     * nothing else in the chapter can see.
+     *
+     * That is not a tolerance to widen. The composer already knows whether it
+     * is inside a band, because it is holding the band, so it asks itself.
+     */
+    for (const z of this._flows ?? []) {
+      if (b >= z.y && a <= z.y + z.h) worst = Math.max(worst, cost(z.flow ?? 0));
+    }
+    for (let i = 0; i <= 8; i++) {
+      worst = Math.max(worst, cost(flowAt(this.zones, this.x, a + ((b - a) * i) / 8)));
+    }
+    return worst;
+  }
+
+  /**
    * Swim until the lungs are `of` of the way down, then come up.
    *
    * The budget is a ceiling, and a ceiling nobody reaches is decoration. A plan
@@ -320,7 +412,7 @@ export class Deep {
     // the same reserve, and using the hole's for both put every vent in the
     // chapter over its budget by about the length of one wait.
     const reserve = () =>
-      (next === 'vent' ? this.ventRunFrom(this.lane) : this.surfaceRun);
+      (next === 'vent' ? this.ventRunFrom(this.lane) : this.surfaceRun) * this.flowDrag;
     while (this.swimSince + len + reserve() < target && n < 20) {
       // Alternating open water and slots, and the slots wander up and down the
       // column so the cost is depth as well as distance.
@@ -339,7 +431,8 @@ export class Deep {
     // horizontal. Cheaper to keep a little back than to be eighteen pixels over
     // and refused.
     const tail = () =>
-      (next === 'vent' ? this.ventRunFrom(this.lane) : this.surfaceRunFrom(this.lane));
+      (next === 'vent' ? this.ventRunFrom(this.lane) : this.surfaceRunFrom(this.lane))
+      * this.flowDrag;
     while (this.swimSince + 150 + tail() + 90 < target && fill++ < 12) {
       this.open({ len: 150 });
     }
@@ -734,19 +827,114 @@ export class Deep {
   }
 
   /** A current: a band of water that pushes, so a line has to be fought for. */
-  current({ power = 150, band = 0.5, len = null } = {}) {
+  /**
+   * A band of moving water.
+   *
+   * `flow` is a fraction of the swimmer's own cruise and its sign is the
+   * direction the water goes: negative is upstream, against the level, which
+   * is the interesting one. `band` is how much of the water column it fills,
+   * centred on the line — a current that fills the whole column is weather and
+   * a current that fills a third of it is a *choice*, because the way past it
+   * is to be somewhere else.
+   *
+   * The piece charges for itself. Everything else in this chapter is paid for
+   * by `swimCost` reading the zones under a leg of the route, and a current is
+   * no different — which is the entire reason the zone is pushed before the
+   * corridor that crosses it is laid, rather than after. Laid the other way
+   * round the composer measures still water and the player swims through
+   * moving water, and that gap is the shape of every bug this chapter has had.
+   */
+  current({ flow = -0.34, band = 0.5, len = null, at = null, keep = false } = {}) {
     this._breathOwed();
+    if (!keep) this._closeFlow();
     const node = this.route[this.route.length - 1];
     const height = Math.round(this.depth * band);
-    this.zones.push({
+    const strength = Math.max(-CURRENT.max, Math.min(CURRENT.max, flow));
+    // `at` puts the band at a fixed place in the water column, 0 at the ice and
+    // 1 at the bed, the way `gate` does — which is what lets a level stack two
+    // of them running opposite ways. Without it a band is centred on wherever
+    // the line happens to be, and two bands would sit on top of each other.
+    const mid = at === null ? node.y : this.depth * at;
+    const zone = {
       kind: 'current',
       x: Math.round(node.x - 140),
-      y: Math.round(Math.max(0, node.y - height / 2)),
-      w: Math.round(len ?? 320),
+      y: Math.round(Math.max(0, Math.min(this.depth - height, mid - height / 2))),
+      w: Math.round(len ?? 0),
       h: height,
-      power,
-    });
+      flow: +strength.toFixed(3),
+    };
+    this.zones.push(zone);
+    // A plan that names a length wants a shove — a band you cross, with still
+    // water the other side. A plan that names none wants a passage, and the
+    // band runs from here to the next breath, however long that turns out to
+    // be. The second is what the levels named after the sea moving were always
+    // describing, so it is the default.
+    if (len === null) (this._flows = this._flows ?? []).push(zone);
     return this;
+  }
+
+  /**
+   * A flume: a narrow channel with the water running across it.
+   *
+   * The route through it is deliberately **flat**. Every depth change in this
+   * chapter is checked against `reachFor`, which knows how long a descent
+   * takes in still water and would be quietly wrong inside vertical water;
+   * rather than teach that rule about flumes, the piece never asks for one.
+   * The cost is charged where every other cost in the sea is charged, inside
+   * `swimCost`, and proved the way every other one is proved — by swimming it.
+   *
+   * The channel picks its depth with `at`, the way a gate does, and for the
+   * same reason a gate had to learn to. The first version cut the channel
+   * around wherever the line happened to be; placed straight after a breath
+   * that is the surface, so the channel was clamped to the top of the water,
+   * the lane ended up *above* its own roof, and the piece composed a level
+   * with a wall in it that nobody drew.
+   *
+   * `rise` is negative for water going up — the one that makes the paid
+   * direction unaffordable — and positive for water going down, which is the
+   * crueller of the two.
+   */
+  flume({ rise = -0.7, len = 460, at = 0.5, lead = null } = {}) {
+    this._breathOwed();
+    const bore = Math.max(this.minGap, Math.round(this.penguinH * FLUME.bore * 2));
+    const margin = 74;
+    const lane = Math.round(
+      Math.max(margin + bore / 2, Math.min(this.depth - margin - bore / 2, this.depth * at)),
+    );
+    const top = Math.round(lane - bore / 2);
+    const bottom = Math.round(lane + bore / 2);
+    // The approach, long enough that the descent into the channel is honest.
+    const need = Math.max(0, this.reachFor(lane - this.lane) - len / 2);
+    this._span(Math.round(lead ?? Math.max(90, need + 40)), margin, this.depth - margin);
+    const x0 = this.x;
+
+    /**
+     * The water is exactly the channel, and no taller.
+     *
+     * It reached past it at first, on the reasoning that the edges have to be
+     * visible from outside — but a swimmer can only ever be *in* the channel,
+     * so every pixel of water above the roof or below the bed was drawn inside
+     * solid ice and did nothing. It read as though the flume were a column the
+     * penguin was about to be dragged up through, which is the opposite of the
+     * truth: a flume is a tube you swim along. What actually needs to be
+     * legible from a distance is where it starts and stops, and that is the
+     * job of the dashed lines at its two ends.
+     */
+    this.zones.push({
+      kind: 'flume',
+      x: Math.round(x0),
+      y: top,
+      w: Math.round(len),
+      h: bottom - top,
+      rise: +Math.max(-FLUME.max, Math.min(FLUME.max, rise)).toFixed(3),
+    });
+
+    this._span(len, top, bottom);
+    // Two nodes, so the leg through the flume is priced as its own thing
+    // rather than smeared into the approach.
+    this._node(x0 + len * 0.25, lane, bottom - top, 'flume');
+    this._node(x0 + len * 0.75, lane, bottom - top, 'flume');
+    return this._keepBreathing();
   }
 
   /** Fish, on the line or a little off it. */

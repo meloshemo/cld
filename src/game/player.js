@@ -7,7 +7,7 @@
  */
 
 import {
-  PHYS, PENGUIN, BOOST, COIL, QUANTUM, SLACK, ROT, GEAR, CLIMB, SWIM, WIND, HUSH, breathFor,
+  PHYS, PENGUIN, BOOST, COIL, QUANTUM, SLACK, ROT, GEAR, CLIMB, SWIM, WIND, HUSH, CURRENT, breathFor,
 } from './config.js';
 import { clamp, damp, rectsOverlap } from '../core/util.js';
 
@@ -75,6 +75,7 @@ export class Player {
   launch(vx, vy) {
     this.vx = vx;
     this.drift = 0;
+    this.driftY = 0;
     this.vy = vy;
     this.onGround = false;
     this.groundFloe = null;
@@ -92,6 +93,7 @@ export class Player {
     this.vx = 0;
     this.vy = 0;
     this.drift = 0;
+    this.driftY = 0;
     this.onGround = false;
     this.groundFloe = null;
     this.coyote = 0;
@@ -158,6 +160,8 @@ export class Player {
     this.mantleBlock = null;
 
     /* --- under the ice ----------------------------------------------- */
+    /** Vertical water carrying the body, px/s, down positive. */
+    this.driftY = 0;
     /**
      * Set by the world for a dive level. Nothing reads it anywhere else, so a
      * shelf level and a mountain level behave exactly as they always have.
@@ -179,7 +183,11 @@ export class Player {
    * but they only lengthen the bar, they never remove it.
    */
   get staminaMax() {
-    return CLIMB.stamina + CLIMB.gripBonus * (this.boost?.grip ?? 0);
+    // Crampons help because they are about contact; rosin is bought for this
+    // and nothing else, which is why it is a multiplier rather than another
+    // term — it should be worth more on a chapter that is entirely holding on.
+    const base = CLIMB.stamina + CLIMB.gripBonus * (this.boost?.grip ?? 0);
+    return base * (1 + (this.boost?.hold ?? 0));
   }
 
   get staminaFrac() {
@@ -195,7 +203,11 @@ export class Player {
    * penguin has already earned it.
    */
   get breathMax() {
-    return breathFor(this.scale);
+    // `breathFor` stays the number the sea is *composed* against — the
+    // composer and the validator both size their corridors from it, and they
+    // do it for a penguin who owns nothing. What a particular player is
+    // carrying is added here and nowhere else.
+    return breathFor(this.scale) * (1 + (this.boost?.lungs ?? 0));
   }
 
   get breathFrac() {
@@ -413,6 +425,9 @@ export class Player {
      * and no further, so a tailwind is a bonus with a ceiling rather than an
      * accelerating slide into the sea.
      */
+    // Vertical water is a swimming thing only; out of the sea the channel is
+    // cleared, exactly as the current's is.
+    this.driftY = 0;
     this.drift += (intent.push ?? 0) * dt;
     this.drift -= this.drift * (this.onGround ? WIND.dragGround : WIND.dragAir) * dt;
     /**
@@ -834,12 +849,27 @@ export class Player {
       const drop = SWIM.drag * dt;
       this.vx = Math.abs(this.vx) <= drop ? 0 : this.vx - Math.sign(this.vx) * drop;
     }
-    this.vx += (intent.push ?? 0) * dt;
-    // A current is not wind: it pushes a swimmer, and the swim branch has no
-    // steering clamp to fight it, so it lives in `vx` where it belongs. The
-    // drift channel is cleared so a gust caught on the way in cannot keep
-    // shoving somebody around underwater.
-    this.drift = 0;
+    /**
+     * Moving water, and it does not belong in `vx`.
+     *
+     * It lived there for a long time on the reasoning that a current pushes a
+     * swimmer rather than blowing past one — which is true, and is not the
+     * question. The swim branch *does* have a steering clamp: `vx` is pinned
+     * to the cruise speed a few lines above this one, every frame, and the
+     * push was added after it. So a current never kept more than a single
+     * frame's worth. Measured, the strongest water in the chapter moved this
+     * bird two pixels a second out of four hundred and eighty.
+     *
+     * `drift` is the channel that survives the clamp, which is precisely why
+     * the wind is in it. Water is not wind, though, and the difference is in
+     * what the channel converges on: a gust pushes against drag and settles
+     * at `push / drag`, whereas a body in the sea simply ends up going the
+     * speed the sea is going. So this is a chase toward the flow rather than
+     * an accumulation against a drag term, and it is cleared on land the same
+     * way it always was.
+     */
+    const flow = intent.flow ?? 0;
+    this.drift += (flow - this.drift) * Math.min(1, CURRENT.grip * dt);
 
     // Up is free, down is held. A penguin floats; it has to *work* to go
     // under, and that is the whole control: the button is the depth.
@@ -849,10 +879,32 @@ export class Player {
     } else {
       this.vy = Math.max(-SWIM.riseMax, this.vy - SWIM.buoyancy * dt);
     }
+    /**
+     * The vertical half of the same vector, carried the same way.
+     *
+     * Written first as a shift of the two clamps above, on the reasoning that
+     * cruising up and cruising down are speeds relative to the water. That is
+     * true, it settles at exactly the right terminal speed, and measured in a
+     * real flume it did almost nothing: a swimmer with the button released
+     * left a channel 3.4 body heights tall in 0.22 seconds against the
+     * strongest water in the game, and in 0.23 seconds against none.
+     *
+     * Buoyancy is why. It takes a sixth of a second to reach a free rise and
+     * covers twenty pixels doing it, so inside a narrow channel the swimmer is
+     * *always* on the acceleration ramp and never reaches either cap — and the
+     * ramp is buoyancy in both cases. A cap that is never reached is a number
+     * in a config file.
+     *
+     * Water carries a body from the first frame. So it lives where the
+     * horizontal current lives, in a drift channel that chases the water over
+     * about an eighth of a second, and the caps go back to being what they
+     * always were.
+     */
+    this.driftY += ((intent.flume ?? 0) - this.driftY) * Math.min(1, CURRENT.grip * dt);
 
-    this.x += this.vx * dt;
+    this.x += (this.vx + this.drift) * dt;
     this._resolveX(floes);
-    this.y += this.vy * dt;
+    this.y += (this.vy + this.driftY) * dt;
     this._resolveY(floes, events);
 
     this.airTime = 0;
@@ -959,19 +1011,25 @@ export class Player {
 
   _resolveY(floes, events) {
     const box = this.box;
+    // Which way the penguin is actually going, not which way it is swimming —
+    // the same distinction `_resolveX` draws for a tailwind. Inside a flume the
+    // water can be carrying a body downwards while it is still trying to rise,
+    // and the surface it meets is the one it is really travelling into.
+    const moveY = this.vy + this.driftY;
     for (const f of floes) {
       if (!f.solid) continue;
       const fb = { x: f.x, y: f.y, w: f.w, h: f.h };
       if (!rectsOverlap(box, fb)) continue;
 
-      if (this.vy >= 0 && box.y + box.h - this.vy * 0.016 <= fb.y + fb.h * 0.8) {
+      if (moveY >= 0 && box.y + box.h - moveY * 0.016 <= fb.y + fb.h * 0.8) {
         // Landing on top.
         this.y = fb.y - this.h;
         this.vy = 0;
+        this.driftY = 0;
         this.onGround = true;
         this.groundFloe = f;
         events?.onStand?.(f);
-      } else if (this.vy < 0) {
+      } else if (moveY < 0) {
         // Rising with the feet already level with the top of the block is a
         // pull-over, not a head-bump. Treating it as a bump teleports the
         // penguin to the *bottom* of whatever it was climbing — the whole
@@ -988,6 +1046,7 @@ export class Player {
           // Bonked the underside.
           this.y = fb.y + fb.h;
           this.vy = 40;
+          this.driftY = 0;
         }
       }
       box.y = this.y;

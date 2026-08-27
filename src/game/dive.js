@@ -65,6 +65,15 @@ const DIVE_PLANS = [
       d.open({ len: 260 });
       d.gate({ at: 0.82, gap: 180 });
       d.hole();
+      /* And then, once, the asymmetry taken away.
+         This level's whole subject is that going down is the thing you pay
+         for — so the flume is the sentence finished: water running *up*
+         through a narrow channel, right after the breath, where the swimmer
+         has just been reminded how cheap rising is. Inside it the button
+         barely works. It is the first time in the chapter that pressing down
+         is not the answer to being too high, and it lands on the level that
+         spent its first half teaching you it always was. */
+      d.flume({ rise: -0.62, len: 420 });
       d.gate({ at: 0.85, gap: 175 });
       d.stretch({ gap: 180, from: 0.62 });
       d.surfaceOut();
@@ -146,15 +155,30 @@ const DIVE_PLANS = [
     target: 50,
     depth: 560,
     breath: 0.75,
-    /* With you, then against you, and the against half is placed where the
-       lungs are already low: a current is only interesting when it costs air
-       rather than time. */
+    /* Two rivers, one above the other, running opposite ways.
+       This level used to be with-you then against-you, one after the other,
+       which is a current happening *to* you: there is nothing to decide, only
+       a stretch that is quick and a stretch that is slow. Stacked instead,
+       it becomes the one question moving water can ask and nothing else in
+       this chapter can. The shallow river fights and the deep river helps —
+       so depth, which has cost the button since the first dive and never once
+       bought anything, is suddenly worth *paying* for. And the slots do not
+       care which river you are in, so the choice is real on both sides: hold
+       the button and go fast down where the air is far, or stay up in the
+       slow water near the ice you will need.
+
+       Then the second half turns it over. Both rivers run against you and the
+       deep one runs harder, so the answer that just worked becomes the
+       expensive one, on the half of the level where the lungs are already
+       low. */
     build: (d) => {
       d.mouth();
-      d.current({ power: 190, band: 0.45 });
+      d.current({ flow: -0.3, band: 0.36, at: 0.24 });
+      d.current({ flow: 0.34, band: 0.36, at: 0.74, keep: true });
       d.gate({ at: 0.35, gap: 172 });
       d.hole();
-      d.current({ power: -210, band: 0.55 });
+      d.current({ flow: -0.26, band: 0.36, at: 0.26 });
+      d.current({ flow: -0.44, band: 0.36, at: 0.76, keep: true });
       d.stretch({ gap: 170, from: 0.42 });
       d.surfaceOut();
       d.scatterFish(3);
@@ -267,16 +291,28 @@ const DIVE_PLANS = [
     depth: 620,
     breath: 0.8,
     /* The two things that take your line away, at the same time. A slot is a
-       precise place to be, and a current is the water deciding where you are. */
+       precise place to be, and a current is the water deciding where you are.
+
+       And then the thing neither of them can do alone. The second half of this
+       level has no hole in the ice: the only air is a crack in the seabed that
+       breathes on a clock, and there is a current running over it. Every other
+       vent in the chapter asks you to *stop*, which costs a wait and nothing
+       else. This one asks you to stop in water that is moving, so holding the
+       one square metre where the air is becomes the work — and the level named
+       Black Water finally has a moment where the sea is deciding where you are
+       while you are trying very hard to be somewhere exact. */
     build: (d) => {
       d.mouth();
-      d.current({ power: -200, band: 0.4 });
+      d.current({ flow: -0.38, band: 0.4 });
       d.gate({ at: 0.34, gap: 152 });
       d.stretch({ gap: 150, from: 0.52 });
       d.hole();
-      d.current({ power: -220, band: 0.6 });
+      d.current({ flow: -0.42, band: 0.6 });
       d.gate({ at: 0.7, gap: 150 });
-      d.stretch({ gap: 152, from: 0.36 });
+      d.stretch({ gap: 152, from: 0.36, next: 'vent' });
+      d.vent();
+      d.gate({ at: 0.44, gap: 150 });
+      d.stretch({ gap: 152, from: 0.4 });
       d.surfaceOut();
       d.scatterFish(3);
       d.checkpointAt(4);
@@ -310,6 +346,16 @@ const DIVE_PLANS = [
       // has the most air and the least reason to think about it.
       d.trench({ at: 0.6, dip: 0.66, len: 340 });
       d.gate({ at: 0.7, gap: 160 });
+      /* Water going down, on the level about getting up.
+         The cruel direction, put where it is cruellest. Everything else in
+         this chapter can be answered by letting go of the button — the bird
+         floats, the ice is up there, and that has been free since the first
+         dive. Here the water pushes the wrong way and there is no button for
+         up; there never was one. It sits on the second lungful, the one this
+         level's own note says has to be spent well, so the answer to being
+         too deep stops working at the exact moment being too deep is the
+         whole problem. */
+      d.flume({ rise: 0.56, at: 0.46, len: 380 });
       d.gate({ at: 0.44, gap: 158 });
       d.stretch({ gap: 162, len: 300, from: 0.34 });
       d.surfaceOut();
@@ -370,11 +416,11 @@ const DIVE_PLANS = [
        eleven levels taught, arriving together, on eleven percent of a lung. */
     build: (d) => {
       d.mouth();
-      d.current({ power: -210, band: 0.5 });
+      d.current({ flow: -0.40, band: 0.5 });
       d.seal({ span: 340, speed: 180 });
       d.gate({ at: 0.38, gap: 148 });
       d.hole();
-      d.current({ power: -230, band: 0.55 });
+      d.current({ flow: -0.44, band: 0.55 });
       d.seal({ span: 360, speed: 185 });
       d.stretch({ gap: 150, from: 0.42 });
       d.surfaceOut();
@@ -402,7 +448,7 @@ const DIVE_PLANS = [
       d.hole();
       d.trench({ at: 0.58, dip: 0.72, len: 380 });
       d.hole();
-      d.current({ power: -200, band: 0.78 });
+      d.current({ flow: -0.36, band: 0.78 });
       d.gate({ at: 0.86, gap: 142 });
       d.stretch({ gap: 144, from: 0.74 });
       d.surfaceOut();
@@ -423,13 +469,18 @@ const DIVE_PLANS = [
        level to lose an evening to. */
     build: (d) => {
       d.mouth();
-      d.current({ power: -210, band: 0.45 });
+      /* A band you cross rather than a passage you live in.
+         Given the whole first lungful it priced out at 4836px against a 3927px
+         lung — two slots at opposite ends of the column and a leopard seal, all
+         of it upstream, is more than one breath can buy. The finale below is
+         the passage; this is the warning. */
+      d.current({ flow: -0.3, band: 0.45, len: 760 });
       d.gate({ at: 0.26, gap: 142 });
       d.seal({ span: 340, speed: 185 });
       d.gate({ at: 0.8, gap: 140 });
       d.hole();
       d.gate({ at: 0.24, gap: 140 });
-      d.current({ power: -240, band: 0.62 });
+      d.current({ flow: -0.52, band: 0.62 });
       d.seal({ span: 360, speed: 195 });
       d.stretch({ gap: 136, len: 190, from: 0.24 });
       d.surfaceOut();

@@ -8,7 +8,7 @@ istiyor.
 
 **Bağımlılık yok, derleme adımı yok, backend yok, görsel/ses dosyası yok.**
 Penguen de, buz da, kuzey ışıkları da, bütün sesler de kodla üretiliyor.
-Toplam yük tek dosyada 619 KB ve çevrimdışı çalışıyor.
+Toplam yük tek dosyada 639 KB ve çevrimdışı çalışıyor.
 
 ▶ **[Oyunu aç](https://claude.ai/code/artifact/2f6dd29b-3ad8-4d60-b4f7-c8490114b96f)**
 
@@ -343,7 +343,7 @@ geçmez, hata verip durur.
 
 ## Testler
 
-Tek komut, 37 paket (28 node + paketleme + 9 tarayıcı), kendi sunucusunu
+Tek komut, 42 paket (33 node + paketleme + 9 tarayıcı), kendi sunucusunu
 kurup kapatıyor ve portu doluysa bir yanına kayıyor:
 
 ```bash
@@ -583,7 +583,7 @@ boşluk o sayıya göre ölçülüyor.
 - **Sabit adımlı fizik (1/120 s).** 60 Hz, 120 Hz ve 144 Hz ekranlarda oyun aynı
   hissettiriyor; arka planda kalan sekme geri geldiğinde penguen ışınlanmıyor.
 - **Görsel/ses varlığı yok.** Penguen, buzlar, kuzey ışıkları, su ve bütün sesler
-  kodla üretiliyor. Tek dosya sürümü 619 KB ve çevrimdışı çalışıyor.
+  kodla üretiliyor. Tek dosya sürümü 639 KB ve çevrimdışı çalışıyor.
 - **Metin koddan ayrı.** Arayüz metinleri tek sözlükte, içeriğe ait metinler
   girdinin kendi `en` bloğunda. Bir dil eklemek bir tablo eklemek.
 
@@ -968,6 +968,256 @@ vuruşta attığı bölümde iki siper: burada siper aşınmıyor, yıkılıyor 
 başına bir yaylım).
 
 Ölçüm sonrası: arena chapter'ının tekrarı **%16 → %10**, fiil sayısı 5 → 6.
+
+## Oluk: denizin beşinci fiili
+
+Dört fiil ve on beş bölümden sonra dalış chapter'ının tekrarı hâlâ %19'du, ve
+kalan ikizler artık düzenlemeyle çözülmüyordu: `seal`, `current`, `trench`,
+`vent` — dördünün mümkün olan bütün ikili birleşimi ya kullanılmıştı ya da
+başka bir bölümle çakışıyordu. Kombinatorik tükenmişti. Yeni bir fiil
+gerekiyordu, ve hangisi olduğu chapter'ın kendi cümlesinde yazılıydı.
+
+Denizin dilbilgisi tek cümle: **yükselmek bedava, dalmak tuşa mal oluyor.**
+Kaldırma kuvveti kuşu bedavaya yukarı taşıyor; aşağı inmek ödediği tek şey. On
+beş dalış bu asimetrinin düzenlemeleri. Diğer dört fiil cümleye *uymayı*
+zorlaştırıyor — geometri yolu daraltıyor, deniz leoparı seni yoldan kovalıyor,
+çukur derin kısmı pahalılaştırıyor, akıntı suyun kendisini uzatıyor. Oluk
+cümleyi **söküyor**.
+
+Yukarı akan su, ödediğin yönü karşılanamaz kılıyor: tuşu basılı tut, yine de
+zar zor batıyorsun. Aşağı akan su daha acımasız, çünkü **bedava** olan yönü
+alıyor — ve yukarı için bir tuş yok, hiç olmadı.
+
+Adı akıntı değil oluk, çünkü bir *yer*, hava durumu değil: üç buçuk penguen
+boyu bir kanal, içinden su geçiyor, ve orada durgun olan tek şey ortadaki hat.
+Bu da onu chapter'ın **ilk saf kontrol sınavı** yapıyor. Diğer her fiil nereye
+gittiğinle ilgili; bu, zaten olduğun yerde kalıp kalamayacağınla.
+
+### Fizik iki kez yazıldı
+
+İlk hâl iki kelepçeyi kaydırıyordu — "yukarı ve aşağı seyir hızları suya
+görelidir", ki doğru bir cümle ve tam doğru terminal hıza oturuyor. Gerçek bir
+olukta ölçüldüğünde neredeyse hiçbir şey yapmıyordu: tuşu bırakan bir yüzücü
+3.4 boyluk kanaldan **oyundaki en güçlü suda 0.22 saniyede**, hiç suyu
+olmayanda **0.23 saniyede** çıkıyordu.
+
+Sebep kaldırma kuvvetinin sertliği. Serbest yükselişe altıda bir saniyede
+varıyor ve bunu yaparken yalnızca yirmi piksel alıyor — yani dar bir kanalda
+yüzücü **her zaman ivme rampasında** ve hiçbir kelepçeye hiç varmıyor. Rampa
+da iki durumda da aynı: kaldırma kuvveti. **Varılmayan bir kelepçe, config
+dosyasındaki bir sayıdır.**
+
+Su bir cismi ilk kareden itibaren taşır. Yani yatay akıntının yaşadığı yerde
+yaşıyor: suyu sekizde bir saniyede kovalayan bir drift kanalında, ve
+kelepçeler eskiden ne idiyse ona geri döndü. Aynı biçim, aynı gerekçe, tek bir
+vektörün iki yarısı. `_resolveY` de artık gerçek hareket yönüne bakıyor
+(`vy + driftY`), tıpkı `_resolveX`'in kuyruk rüzgârı için yaptığı gibi.
+
+### İçinden geçen rota bilerek düz
+
+Bu chapter'daki her derinlik değişimi `reachFor` ile denetleniyor, ve o
+durgun suyu biliyor — dikey suyun içinde sessizce yanlış olurdu. Kurala
+olukları öğretmek yerine parça hiç derinlik değişimi *istemiyor*. Bedeli,
+denizdeki her bedelin alındığı yerden alınıyor: `swimCost` içinde. Kanıtı da
+her bedelin kanıtlandığı yerden: yüzülerek.
+
+Kanal derinliğini `at` ile seçiyor, `gate` gibi — ve `gate`'in bunu öğrenmek
+zorunda kaldığı sebeple. İlk hâli kanalı hattın olduğu yere açıyordu; nefesten
+hemen sonra bu yüzey demek, kanal suyun tepesine kırpılıyor, ve hat **kendi
+tavanının üstünde** kalıyordu: kimsenin çizmediği bir duvarı olan bölüm.
+
+### Nereye konduğu
+
+**48 Aşağı Bas** — yukarı akan su, nefesten hemen sonra, yükselmenin ne kadar
+ucuz olduğunun yeni hatırlatıldığı yerde. İçeride tuş zar zor çalışıyor.
+Chapter'da ilk kez, çok yukarıda olmanın cevabı "aşağı bas" değil — ve bu, ilk
+yarısını sana hep öyle olduğunu öğreterek geçiren bölümde oluyor.
+
+**57 İki Ciğer** — aşağı akan su, yukarı çıkmakla ilgili bölümde. Acımasız yön,
+en acımasız yere. Bu chapter'da her şeyin cevabı tuşu bırakmak olabilir: kuş
+yüzer, buz yukarıdadır, ve bu ilk dalıştan beri bedava. Burada su **yanlış
+yöne** itiyor. İkinci ciğerde duruyor — bölümün kendi notunun "iyi harcanmalı"
+dediği ciğerde — yani çok derinde olmanın cevabı, tam olarak çok derinde
+olmanın bütün problem olduğu anda çalışmayı bırakıyor.
+
+Ölçüm sonrası: dalış chapter'ının tekrarı **%19 → %12**, fiil sayısı 10 → 11,
+ve 48 ile 57 ikiz listesinden çıktı. Chapter artık oyundaki en tekrarlı bölüm
+değil.
+
+## Etkisiz mekanik taraması
+
+Akıntı onarıldıktan sonra sorulması gereken soru şuydu: **başka kaç tanesi
+böyle?** Bir mekanik, hiçbir çözücünün ve hiçbir doğrulayıcının haber
+veremeyeceği bir biçimde oyundan eksik olabilir — bölümler yine besteleniyor,
+biri yine bitiriyor, ve tek belirti chapter'ın düz hissettirmesi.
+
+Her mekanik tek tek ölçüldü: rüzgâr `drift` kanalında 200 itiş için saniyede
+98 piksel taşıyor; sessiz alan zıplamayı gerçekten büyütüyor; cam buz tutuşu
+gerçekten kesiyor; çukur, baca, siper, sarkaç, kavisli atış hepsi ısırıyor.
+
+Ve tarama kendi cevabını da verdi: **akıntı, kendi paketi olmayan tek
+mekanikti.** Kapsamdaki tek boşluk, hatanın yaşadığı yerin ta kendisiydi.
+
+Geriye bir tane kalmıştı — deniz leoparı — ve o da ancak elle ölçülmüştü, ki
+bu akıntının onarımdan önceki durumunun aynısı. Artık `tests/seal.mjs` var ve
+üç kural kanıtlıyor: devriye geziyor (kımıldamayan bir tehlike, çarpışma
+kutusu olan dekordur), temasta öldürüyor, ve **suyun altında üstüne
+basılamıyor** — buzun üstünde bir tehlikeye atlamak oyunun cesarete verdiği
+ödül, ama suda küçük olan penguen. `world.js` bunu bir yorumda söylüyordu, ve
+bir yorum test değildir.
+
+## Akıntı gerçek olunca iki bölüm yeniden yazıldı
+
+Akıntı çalışmaya başlayınca `tools/variety.mjs`'in yıllardır söylediği şey
+anlam kazandı: dalış chapter'ının ikizleri, ayırt edici fiili boş olan
+bölümlerdi. Onarım tek başına oyunu değiştirdi, ama iki bölüm hâlâ *aynı
+soruyu* soruyordu. İkisi de yeniden yazıldı — yeni bir fiil eklemeden, var
+olanları daha önce hiç denenmemiş biçimde üst üste koyarak.
+
+**52 Akıntı — üst üste iki nehir.** Eskiden önce seninle sonra sana karşı,
+arka arkaya: yani sana *olan* bir akıntı, karar yok, sadece hızlı bir bölüm
+ve yavaş bir bölüm. Şimdi ikisi aynı anda ve üst üste. Sığ nehir sana karşı,
+derin nehir seninle. Bu chapter'da derinlik ilk dalıştan beri tuşa basmaya
+mal oluyordu ve karşılığında hiçbir şey vermiyordu; burada ilk kez **satın
+alınmaya değer**. Geçitler hangi nehirde olduğunu umursamıyor, yani seçim iki
+tarafta da gerçek: tuşu basılı tut ve havanın uzak olduğu derinlikte hızlan,
+ya da yukarıda yavaş suda kal, ihtiyacın olacak buzun yanında.
+
+İkinci yarı bu cevabı ters çeviriyor: iki nehir de sana karşı ve **derin olan
+daha sert**. Az önce işe yarayan cevap, ciğerin zaten azaldığı yarıda pahalı
+olanı hâline geliyor.
+
+Bunun için besteciye `at` geldi — bandı su sütununda sabit bir yere koyuyor,
+`gate`'in yaptığı gibi — ve aynı anda birden fazla açık bant taşıyabilmesi.
+
+**56 Kara Su — akıntının içinde bir baca.** Bölümün ikinci yarısında buzda
+delik yok: tek hava, tabanda saatle nefes alan bir çatlak, ve **üstünden bir
+akıntı geçiyor**. Chapter'daki her baca *durmanı* istiyor, ki bedeli sadece
+bir bekleme. Bu baca, suyun aktığı yerde durmanı istiyor — havanın olduğu bir
+metrekarede kalmak işin kendisi hâline geliyor. Adı Kara Su olan bölüm nihayet
+denizin nerede olduğuna karar verdiği, senin ise çok kesin bir yerde olmaya
+çalıştığın bir ana sahip.
+
+Ölçüm sonrası: dalış chapter'ının tekrarı **%23 → %19**, ve 56 ikiz
+listesinden tamamen çıktı. 47–49 kasıtlı olarak listede kalıyor: onlar
+chapter'ın dilbilgisini öğreten üçlü, ve bir öğretme sırasını bir metriği
+düşürmek için bozmak, ölçmenin amacını kaçırmak olur.
+
+## Sürüm dosyasının sessizce değiştirdiği çarpma
+
+Akıntı onarımı bittiğinde node paketlerinin hepsi geçiyordu ve **tek dosya
+sürümü açılmıyordu**. Aynı kod, aynı bölüm, iki farklı sonuç:
+
+```
+52. Akıntı: çıkışa nefes yetmiyor: 3418px, bir ciğer 3347px
+```
+
+`config.js`, `deep.js` ve `dive.js` — üçü de sürüm dosyasında kaynakla
+**birebir aynıydı**. Modül sırası da aynıydı; hepsini sırayla node'da içe
+aktarmak hiçbir şeyi bozmadı. Sonunda besteci iki koşuda adım adım
+karşılaştırıldı, ve fark `stretch`'in yedek payındaydı:
+
+```js
+    const tail = () =>
+      (next === 'vent' ? this.ventRunFrom(this.lane) : this.surfaceRunFrom(this.lane))
+      * this.flowDrag;
+```
+
+Sürüm dosyasında **son satır yoktu.**
+
+`tools/bundle.mjs` modülleri tek dosyaya alırken yorumları ayıklıyor, ve
+ayıklayıcıda şu satır vardı:
+
+```js
+if (t.startsWith('*') && !t.startsWith('*/')) continue;
+```
+
+Yani "`*` ile başlayan satır JSDoc'un ortasıdır". Blok yorumun içindeyken bu
+zaten üstteki dal tarafından hallediliyordu — yani satır **gereksizdi**. Blok
+yorumun *dışında* ise `*` ile başlayan bir satır yorum değil, **devam eden bir
+ifadedir**.
+
+Ve en kötüsü bu: satır silindikten sonra geriye kalan şey hâlâ geçerli
+JavaScript. Otomatik noktalı virgül ekleme ok fonksiyonunu kapatıyor, hiçbir
+yerde hata fırlamıyor, sürüm dosyası sessizce **başka bir çarpma** yapıyor.
+Besteci sürüm dosyasında modüllerdekinden daha az hava ayırıyordu.
+
+İkinci bir kurban da vardı ve onu ancak test buldu: `world.js` içinde
+
+```js
+      flow = flowAt(this.zones, this.player.centerX, this.player.y + this.player.h / 2)
+        * this.player.swimSpeed;
+```
+
+Aynı şekilde son satırı siliniyordu — yani sürüm dosyasında akıntı, saniyede
+piksel yerine **kesir** olarak uygulanıyordu: yeni onarılmış mekanik, indirilen
+oyunda yaklaşık beş yüz kat zayıf olacaktı.
+
+Onarım ayıklayıcıdaki o satırı silmek. Yanına da `tests/strip.mjs` geldi:
+yorum sanılmaya en müsait satırlardan kurulu bir paket — satır başında `*`,
+`/`, `**`, metin içinde `//`, şablon içinde `/*` — ve bütün kaynaklar üzerinde
+tek bir iddia: **silinen her satır gerçekten yorum olmalı.**
+
+Bir hatanın alabileceği en kötü biçim budur: bir derleme adımının programın
+anlamını, hâlâ ayrıştırılabilir kalacak şekilde değiştirmesi.
+
+## Hiç var olmamış akıntı
+
+Bu chapter'ın üçüncü fiili yazıldığı günden beri oradaydı, beş bölüm onun
+üstüne kurulmuştu, ikisinin adı oydu — ve **hiçbir şey yapmıyordu**.
+
+Ölçüm şu: oyundaki en güçlü akıntı, `power: -240`, chapter'ın duvarı olması
+gereken bölümde, penguenin hızını saniyede **480 pikselden 478'e** düşürüyordu.
+Yüzde dört onda bir.
+
+Sebep tek bir satırın sırasıydı. Yüzme dalında yatay hız her karede seyir
+hızına kırpılıyor, ve akıntı kırpmadan *sonra* ekleniyordu — yani bir akıntı
+hiçbir zaman tek bir karelik itişten fazlasını taşıyamıyordu. Üstündeki yorum
+"akıntı rüzgâr değildir, yüzücüyü iter, o yüzden `vx`'te yaşar" diyordu. Doğru
+bir cümle, ve yanlış sonuç: `vx` kırpılan kanal. Rüzgârın `drift` kanalında
+olmasının sebebi tam olarak budur.
+
+Üç ayrı eksiklik birbirini koruyordu. Akıntı **çizilmiyordu**, o yüzden kimse
+yokluğunu görmedi. **Fiyatlandırılmıyordu**, o yüzden besteci durgun suya göre
+koridor seriyordu. Ve **çalışmıyordu**, o yüzden bölümler rahat geçiliyordu —
+ki bir çözücünün göremeyeceği tek hata türü budur. `validate-dive` koridorun
+doğru şekilde olduğunu kanıtlıyordu ve öyleydi; `dive-run` birinin bitirdiğini
+kanıtlıyordu ve bitiriyordu. Chapter'ın bütün kontrolleri bir şeyin *mümkün*
+olduğunu soruyordu, ve etkisiz bir tehlike hepsini kolayca geçer.
+
+`tools/variety.mjs` bu bölümleri var olduğu günden beri sade bölümlerin ikizi
+olarak işaretliyordu. Haklıydı, ve göremediği tam sebepten: **ayırt edici tek
+fiili hiçbir şey yapmayan bir bölüm, sade bölümün ta kendisidir.**
+
+Onarım birimde. `flow` artık isimsiz birimlerde bir ivme değil, yüzücünün kendi
+seyir hızının bir **kesri**: 0.4'te su, penguenin yüzdüğü hızın onda dördüyle
+akıyor, karşısına yüzmek `1/(1-0.4)` kadar sürüyor, ve bu chapter havayı
+mesafeyle ölçtüğü için üçte iki fazla **hava** demek. Kesir olması penguen
+büyüdükçe de doğru kalmasını sağlıyor.
+
+Dört yerde birden gerçek oldu:
+
+- **Fizik** — akıntı kırpmayı atlatan `drift` kanalına taşındı, ama rüzgâr gibi
+  bir sürüklenme terimine karşı birikerek değil: sudaki bir cisim sonunda
+  suyun gittiği hızda gider, o yüzden kanal akıntıya doğru *kovalıyor*.
+- **Fiyat** — `swimCost`, chapter'ın her bacağı fiyatlandırdığı tek fonksiyon,
+  artık akıntıyı da örnekliyor. Akıntıya karşı bir bacak, gerçekten olduğu
+  daha uzun yüzüş olarak yazılıyor; çukurun ödendiği yöntemin aynısı.
+- **Yedek** — `stretch`'in yüzeye çıkış payı mesafeydi, `swimSince` ise bedel.
+  Bandın *içinde* doğru piksel, yanlış saniye ayrılıyordu. Şimdi pay, çıkışın
+  geçeceği bütün su sütunundaki en kötü akıntıyla çarpılıyor.
+- **Görüntü** — su nihayet çiziliyor: gerçek hızında kayan çizgiler, gerçek
+  yönünde, kenarında kesikli bir çizgiyle. Hızını yarıya indiren bir tehlikeyi
+  görememek tehlike değil, pusudur.
+
+Sonuç bir **reddediliş** oldu, ki sistemin çalıştığının kanıtı: **61 Açık
+Deniz** artık ilk ciğerini karşılamıyordu — sütunun iki ucunda birer geçit ve
+bir deniz leoparı, hepsi akıntıya karşı, 3927 piksellik ciğere karşı 4836
+piksel. Bölümün açılışı artık *geçilen* bir bant, finali ise *içinde
+yaşadığın* bir geçit.
+
+Ve yeni bir paket: `tests/current.mjs`. Diğerlerinin sorduğu "geçilebilir mi"
+yerine bunun sorduğu soru **"ısırıyor mu"**.
 
 ## Deniz tabanındaki baca: denizin "ne zaman"ı
 
@@ -2259,9 +2509,9 @@ anlatmak değil, olan bir şeyi olduğundan iyi anlatmaktır.
 | Müzik | Tek tema, 5 sahne, 5 katman, ses saatinde planlanıyor, ses dosyası yok |
 | Dil | Türkçe ve İngilizce, 307 metin, tarayıcıdan seçiliyor |
 | Kayıt | Tek sürümlü JSON, ileri göç, dosyaya aktarma, tek tuşla silme |
-| Çevrimdışı | Servis çalışanı + tek dosya sürümü (619 KB) |
+| Çevrimdışı | Servis çalışanı + tek dosya sürümü (639 KB) |
 | Girdi | Klavye, dokunmatik, gamepad |
-| Test | 28 node + paketleme + 9 tarayıcı paketi, hepsi tek komutta |
+| Test | 33 node + paketleme + 9 tarayıcı paketi, hepsi tek komutta |
 | Zorluk | Ölçülen eğri: `node tools/difficulty.mjs` |
 
 ### Yok, ve neden
