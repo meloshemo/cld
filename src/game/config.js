@@ -1087,10 +1087,100 @@ export const FLUME = {
  * `flowAt` reads to the right — the two of them are one vector split in half,
  * and a sign that flips between them is a bug waiting for somebody tired.
  */
+/**
+ * Girdap — the sea's sixth verb, and the first water with a *shape*.
+ *
+ * A current is uniform and a flume is uniform: both of them are the same push
+ * everywhere inside a rectangle, which makes them things you budget for rather
+ * than things you read. Past a certain number of levels that is the whole
+ * problem with the chapter — the water asks the same question in a different
+ * place fifteen times.
+ *
+ * An eddy is the same two force channels arranged in a circle, and that one
+ * change makes it a puzzle instead of a toll: where you are inside it decides
+ * what it does to you. Cross the ring and it throws you sideways; the rim and
+ * the eye are both still.
+ *
+ * The still eye is the point. A hazard with no answer is a wall, and every
+ * other thing the sea does can at least be paid for in breath. This one can be
+ * *solved*: get to the middle, and the sea lets go of you.
+ */
+export const EDDY = {
+  /** The strongest rotation the composer will accept, as a fraction of cruise. */
+  max: 0.7,
+  /**
+   * Where the water is fastest, as a fraction of the radius.
+   *
+   * Zero at the centre and zero at the rim, peaking between them, so a cell
+   * has an edge you can be outside of and a middle you can be inside of. A
+   * vortex that is fastest at its centre is a drain, and a drain in a game
+   * about holding your breath is a death with no reply.
+   */
+  peak: 0.5,
+  /**
+   * What crossing the ring costs, on top of the water's own push.
+   *
+   * The flume charges for holding a lane against a steady shove. A ring is
+   * worse than that and the difference is not the strength, it is the
+   * *reversal*: the push you have corrected for is the opposite push a second
+   * later, so the correction has to be unlearned in the middle of the cell.
+   *
+   * The number was set by the disagreement it was written to end. The first
+   * girdap on the finale of the chapter passed the validator — which prices
+   * the route line, and a route line goes through the still eye — and then
+   * drowned the solver four hundred pixels short of the exit, every attempt,
+   * because a swimmer is not a line. Priced at this, the composer refuses that
+   * level itself and says so in pixels, which is where a disagreement between
+   * the two proof layers belongs.
+   */
+  charge: 0.62,
+};
+
+/** How hard the water is turning here, as a fraction of the strongest ring. */
+export function spinLoad(zones, cx, cy) {
+  if (!zones) return 0;
+  let worst = 0;
+  for (const z of zones) {
+    if (z.kind !== 'eddy') continue;
+    const t = eddySpin(z, cx, cy);
+    if (!t) continue;
+    worst = Math.max(worst, (Math.abs(z.spin ?? 0) * t.f) / EDDY.max);
+  }
+  return Math.min(1, worst);
+}
+
+/**
+ * How hard the water turns at this point of an eddy, and which way.
+ *
+ * Returns `{ u, v, f }` — the unit tangent (u across, v down) and the strength
+ * envelope. Shared so the world, the composer's price, the validator and the
+ * renderer cannot disagree about where the eye is, which is exactly the kind
+ * of drift that let the current sit inert for a whole chapter.
+ */
+function eddySpin(z, cx, cy) {
+  const rx = z.w / 2;
+  const ry = z.h / 2;
+  const u = (cx - (z.x + rx)) / rx;
+  const v = (cy - (z.y + ry)) / ry;
+  const r = Math.hypot(u, v);
+  if (r > 1 || r < 1e-6) return null;
+  // Peaks at `EDDY.peak`, zero at both ends: sin is the cheapest curve that
+  // does that, and the shape only has to be smooth, not physical.
+  const f = Math.sin(Math.PI * Math.min(1, r ** (Math.log(0.5) / Math.log(EDDY.peak))));
+  // Clockwise for a positive spin: moving right along the top, down the right
+  // side. Screen coordinates, so v grows downward.
+  return { u: -v / r, v: u / r, f };
+}
+
 export function flumeAt(zones, cx, cy) {
   if (!zones) return 0;
   let total = 0;
   for (const z of zones) {
+    if (z.kind === 'eddy') {
+      const t = eddySpin(z, cx, cy);
+      if (t) total += (z.spin ?? 0) * t.v * t.f;
+      continue;
+    }
     if (z.kind !== 'flume') continue;
     if (cx < z.x || cx > z.x + z.w) continue;
     if (cy < z.y || cy > z.y + z.h) continue;
@@ -1103,6 +1193,11 @@ export function flowAt(zones, cx, cy) {
   if (!zones) return 0;
   let total = 0;
   for (const z of zones) {
+    if (z.kind === 'eddy') {
+      const t = eddySpin(z, cx, cy);
+      if (t) total += (z.spin ?? 0) * t.u * t.f;
+      continue;
+    }
     if (z.kind !== 'current') continue;
     if (cx < z.x || cx > z.x + z.w) continue;
     if (cy < z.y || cy > z.y + z.h) continue;
@@ -1272,7 +1367,10 @@ export function swimCost(zones, a, b, samples = 12) {
     // validator's stretch check all see it without being told about it.
     const held = Math.min(1, Math.abs(flumeAt(zones, x, y + sag)) / SWIM.riseMax);
     const lane = 1 / (1 - FLUME.charge * held);
-    total += (dist / samples) * trenchDrainAt(zones, x, y + sag) * drag * lane;
+    // And a ring costs more than the shove it is made of, because the
+    // correction reverses halfway across it.
+    const ring = 1 / (1 - EDDY.charge * spinLoad(zones, x, y + sag));
+    total += (dist / samples) * trenchDrainAt(zones, x, y + sag) * drag * lane * ring;
   }
   return total;
 }
@@ -2001,6 +2099,60 @@ export const UPGRADES = [
    * `tests/` runs a penguin with an empty inventory, so an upgrade is only
    * ever allowed to be the difference between hard and less hard.
    */
+  {
+    /*
+     * Three powers for the three things the sea learned to do.
+     *
+     * The shop had nothing to sell against a current, a flume or a trench,
+     * because when it was written the sea could not do any of them: the
+     * current was inert, the flume did not exist, and the trench was new. A
+     * player who finds chapter three brutal — which is the intention — had no
+     * way to spend fish on it, and a difficulty the shop cannot answer is not
+     * difficulty, it is a wall.
+     *
+     * None of them switches a mechanic off. Fins do not make you immune to
+     * moving water, they make you a stronger swimmer in it; ballast does not
+     * pin you to the lane, it makes the water shove you less. The hardest
+     * setting of every one of them still leaves the thing in the level.
+     */
+    id: 'fins',
+    group: 'saha',
+    name: 'Yüzgeç',
+    blurb: 'Akıntı seni daha az sürüklüyor.',
+    en: { name: 'Fins', blurb: 'The current drags you less.' },
+    icon: 'fin',
+    levels: [
+      { cost: 260, effect: 0.18, label: 'akıntı −%18', en: { label: 'current −18%' } },
+      { cost: 720, effect: 0.32, label: 'akıntı −%32', en: { label: 'current −32%' } },
+      { cost: 1600, effect: 0.45, label: 'akıntı −%45', en: { label: 'current −45%' } },
+    ],
+  },
+  {
+    id: 'ballast',
+    group: 'saha',
+    name: 'Safra Taşı',
+    blurb: 'Oluğun dikey suyu hattından daha az koparıyor.',
+    en: { name: 'Ballast', blurb: 'A flume pulls you off the lane less.' },
+    icon: 'weight',
+    levels: [
+      { cost: 300, effect: 0.2, label: 'oluk −%20', en: { label: 'flume −20%' } },
+      { cost: 820, effect: 0.34, label: 'oluk −%34', en: { label: 'flume −34%' } },
+      { cost: 1750, effect: 0.46, label: 'oluk −%46', en: { label: 'flume −46%' } },
+    ],
+  },
+  {
+    id: 'insulation',
+    group: 'dayanma',
+    name: 'Yağ Tabakası',
+    blurb: 'Soğuk çukurda nefes daha yavaş tükeniyor.',
+    en: { name: 'Blubber', blurb: 'Cold water empties the lungs slower.' },
+    icon: 'flame',
+    levels: [
+      { cost: 240, effect: 0.16, label: 'çukur −%16', en: { label: 'trench −16%' } },
+      { cost: 680, effect: 0.28, label: 'çukur −%28', en: { label: 'trench −28%' } },
+      { cost: 1500, effect: 0.4, label: 'çukur −%40', en: { label: 'trench −40%' } },
+    ],
+  },
   {
     id: 'rosin',
     group: 'saha',
