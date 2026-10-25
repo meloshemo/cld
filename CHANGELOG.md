@@ -5,6 +5,26 @@ değiştiği yeterli. En yeni en üstte.
 
 ---
 
+## Android 16'yı hedefliyor — Play artık başkasını kabul etmiyor
+
+Konsol, dahili teste sunmayı tek bir hatayla durdurdu: paket API 35'i
+hedefliyordu, en düşük kabul edilen 36. `compileSdk` ve `targetSdk` 36 oldu.
+
+İki şey bununla birlikte gelmek zorundaydı:
+
+- **Android Gradle eklentisi 8.7.3 → 9.4.1.** 8.7.3 API 36'yı tanımıyor.
+  8.13.2 tanıyor ama Actions'taki Gradle 9.8.1'de açılmıyor — 9.6'da kaldırılan
+  bir iç API'ye dayanıyor. 9.4.1 ikisiyle de derliyor.
+- **Geri tuşu yeniden bağlandı.** Android 16'yı hedefleyen bir uygulamada
+  `onBackPressed()` hiç çağrılmıyor; değişmeden kalsaydı geri tuşu oyunu
+  duraklatmak yerine kapatırdı. 13 ve üstünde sistemin geri olayına kayıt
+  olunuyor, altında eski yol duruyor; oyuna sorulan soru aynı.
+
+API 36 emülatöründe denendi: oynarken geri duraklatıyor, duraklamışken menüye
+dönüyor, başlıkta çıkıyor. Paketin hâlâ tek bir izni yok.
+
+---
+
 ## Oyun Play'de: paket, metinler ve görseller API'den gitti
 
 `Play'e yükle` düğmesi ucundan ucuna çalıştı. Play'in kendi okuması:

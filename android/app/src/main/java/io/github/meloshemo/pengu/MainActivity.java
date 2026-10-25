@@ -10,6 +10,7 @@ import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.window.OnBackInvokedDispatcher;
 
 import androidx.webkit.WebViewAssetLoader;
 
@@ -96,6 +97,16 @@ public class MainActivity extends Activity {
 
     setContentView(web);
     web.loadUrl("https://appassets.androidplatform.net/assets/pengu.html");
+
+    // From Android 16 on, an application that targets it never sees
+    // onBackPressed() — the key goes to whatever is registered here, and with
+    // nothing registered it simply closes the game mid-jump. Registering one
+    // keeps back a game action on every version; below 13 the override at the
+    // bottom of the file still does the same job.
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+      getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
+          OnBackInvokedDispatcher.PRIORITY_DEFAULT, this::handleBack);
+    }
   }
 
   @Override
@@ -141,6 +152,14 @@ public class MainActivity extends Activity {
   public void onBackPressed() {
     if (web == null) {
       super.onBackPressed();
+      return;
+    }
+    handleBack();
+  }
+
+  private void handleBack() {
+    if (web == null) {
+      finish();
       return;
     }
     // Asked of the game rather than assumed: the answer is "exit" only when
