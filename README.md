@@ -162,7 +162,7 @@ hedef var ve **gün boyunca birikiyorlar**: tek turda hepsini yapman gerekmiyor.
 | [Arayüz](#arayüz) | Market, bölüm listesi, düzen testi |
 | [Kimlik ve müzik](#kimlik) | Oyuncu profili, unvanlar, uyarlanan müzik |
 | [Diller](#diller) | Türkçe ve İngilizce, sözlük ve denetimler |
-| [Belgeler](docs/) | Gizlilik, kullanım şartları, bilgisayarda yapılacaklar |
+| [Belgeler](docs/) | Gizlilik ve kullanım şartları |
 
 ---
 
@@ -447,10 +447,6 @@ Her `push`'ta iki iş: **Bölümler ve kurallar** (kurulumsuz, ~15 sn) ve
 **Mekanikler** (Chromium indirip üç tarayıcı testi, ~2 dk). `main`'e giden
 yol yeşil olmadan yayına çıkmıyor.
 
-Bilgisayarda yapılması gerekenler, Pages'i açmak, gerçek cihazda oynamak,
-mağaza ve ödeme kararları, ayrı bir dosyada:
-**[`docs/BILGISAYARDA.md`](docs/BILGISAYARDA.md)**.
-
 **Doğrulayıcı** oynamadan, analitik olarak, her bölümdeki her sıçramanın
 penguenin o bölümdeki gerçek erişim mesafesi içinde olduğunu doğrular. 31 elle
 yazılmış bölümü ve üretilen bölümlerden 80'lik bir örneklemi kapsar: **3.271
@@ -574,8 +570,6 @@ docs/
   GIZLILIK.md · PRIVACY.md          gizlilik, iki dilde
   KULLANIM-SARTLARI.md · TERMS.md   kullanım şartları, iki dilde
   MAGAZA.md                         iki mağaza için metinler, cevaplar, adımlar
-  YAPILACAKLAR.md                   tek iş listesi
-  BILGISAYARDA.md                   uzaktan yapılamayan işler
 store/                              mağaza görselleri (yayına gitmez)
 ```
 
