@@ -10,7 +10,7 @@ istiyor.
 Penguen de, buz da, kuzey ışıkları da, bütün sesler de kodla üretiliyor.
 Toplam yük tek dosyada 694 KB ve çevrimdışı çalışıyor.
 
-▶ **[Oyunu aç](https://claude.ai/code/artifact/2f6dd29b-3ad8-4d60-b4f7-c8490114b96f)**
+▶ **[Oyunu aç](https://meloshemo.github.io/cld/)**
 
 ---
 
