@@ -3588,7 +3588,7 @@ anlatmak değil, olan bir şeyi olduğundan iyi anlatmaktır.
 | **Gerçek sıralama tablosu** | Süreler cihazda duruyor, paylaşım koduyla dolaşıyor. Lig kademeleri bir hedef, bir sıralama değil. |
 | **Gamepad testi** | Kod var, otomatik testi yok. Gerçek bir kolla denenmeli. |
 | **Safari ve Firefox testi** | Otomatik testler yalnızca Chromium'da. |
-| **Gerçek cihazda oynama** | Hiçbir otomatik test bunun yerine geçmiyor ve hâlâ yapılmadı: [`docs/BILGISAYARDA.md`](docs/BILGISAYARDA.md) §4. |
+| **Gerçek cihazda oynama** | Hiçbir otomatik test bunun yerine geçmiyor ve hâlâ yapılmadı. |
 | **Tehlike zamanlaması çözücüde yok** | Çözücüler zeminin ulaşılabilir olduğunu kanıtlıyor; gayzerin patlama anı, orkanın sıçrama anı ve fokun devriyesi saat meselesi ve `validate-levels.mjs` içinde kontrol ediliyor. |
 
 ---
