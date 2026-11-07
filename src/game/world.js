@@ -1028,7 +1028,7 @@ export class World {
         this.audio.burst();
         this.particles.splash(this.player.centerX, f.y);
         this.shake(9);
-        this.showHint('Gayzer!', 1.1);
+        this.showHint(t('world.geyser'), 1.1);
       }
       f._launched = true;
     }

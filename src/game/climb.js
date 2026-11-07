@@ -46,7 +46,7 @@ const CLIMB_PLANS = [
   /* ------------------------------------------------ 32–34 · the grip */
   {
     name: 'Buzulun Eteği',
-    signs: [{ dx: 92, dy: -104, text: 'Duvara doğru bas: tutun  •  Tutunurken BOŞLUK: tırman' }],
+    signs: [{ dx: 92, dy: -104, key: 'sign.climb' }],
     subtitle: 'Yukarısı çok uzak',
     en: { name: "The Glacier's Foot", subtitle: 'The top is a long way up' },
     target: 40,
@@ -635,6 +635,7 @@ function compose(plan, id) {
     x: def.spawn.x + (s.dx ?? 0),
     y: def.spawn.y + (s.dy ?? -96),
     text: s.text,
+    key: s.key,
   }));
   def.ship = plan.ship !== false;
   def.menace = menaceFor((id - CLIMB_FROM) / (CLIMB_PLANS.length - 1));

@@ -19,6 +19,52 @@ const KEY_MAP = {
   Enter: 'confirm',
 };
 
+/**
+ * What the player is holding right now: a touchscreen, a keyboard or a pad.
+ *
+ * The first sign of level one used to read "Yürü: ← →  •  Zıpla: BOŞLUK" on a
+ * phone, which has neither arrows nor a space bar, and in Turkish on a phone
+ * set to English. The hints are now chosen by language *and* by this, which is
+ * whatever was pressed last — so a laptop with a touchscreen shows key hints
+ * the moment a key is used, and a pad shows pad hints.
+ */
+let lastKind =
+  typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches ? 'touch' : 'keys';
+
+export function inputKind() {
+  return lastKind;
+}
+
+function noteKind(kind) {
+  if (kind === lastKind) return;
+  lastKind = kind;
+  if (typeof document !== 'undefined') document.documentElement.dataset.input = kind;
+}
+
+if (typeof document !== 'undefined') document.documentElement.dataset.input = lastKind;
+
+/**
+ * A short tap of the phone's own haptics, where there is one to ask.
+ *
+ * The Android shell exposes `PenguNative.haptic`, which goes through the
+ * view's own haptic feedback and therefore needs no vibrate permission. In a
+ * browser there is no such bridge and this does nothing at all: the browser's
+ * vibrate call is left alone on purpose, because the packaged app does not
+ * hold that permission and the web version should not feel different.
+ */
+let hapticsOn = true;
+export function setHaptics(on) {
+  hapticsOn = Boolean(on);
+}
+export function haptic(kind = 'tap') {
+  if (!hapticsOn) return;
+  try {
+    window.PenguNative?.haptic?.(kind);
+  } catch {
+    /* a bridge that is gone is a bridge that is not there */
+  }
+}
+
 export class Input {
   constructor() {
     this.state = { left: false, right: false, jump: false };
@@ -48,6 +94,7 @@ export class Input {
       // Space/arrows would otherwise scroll the page.
       if (e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault();
       if (e.repeat) return;
+      noteKind('keys');
       this._sources.key.add(action);
       this._sync();
       this._emit(action);
@@ -80,6 +127,8 @@ export class Input {
       e.preventDefault();
       el.setPointerCapture?.(e.pointerId);
       el.classList.add('is-pressed');
+      noteKind('touch');
+      haptic(action === 'jump' ? 'jump' : 'tap');
       this._sources.touch.add(action);
       this._sync();
       this._emit(action);
@@ -95,6 +144,64 @@ export class Input {
     el.addEventListener('pointercancel', release);
     el.addEventListener('pointerleave', release);
     el.addEventListener('contextmenu', (e) => e.preventDefault());
+  }
+
+  /**
+   * Left and right as one pad you can slide across.
+   *
+   * Two separate buttons each captured the finger that pressed them, so
+   * rolling the thumb from ← to → kept walking left until the thumb was lifted
+   * and put down again — the single most common complaint about on-screen
+   * arrows. Here the pair is one surface: wherever the finger is, left of the
+   * middle is left and right of it is right, and it follows the finger as it
+   * moves. Each button still lights up on its own.
+   */
+  bindDpad(zone, leftEl, rightEl) {
+    if (!zone || !leftEl || !rightEl) return;
+    const fingers = new Map();
+    const sideOf = (x) => {
+      const l = leftEl.getBoundingClientRect();
+      const r = rightEl.getBoundingClientRect();
+      const mid = (l.right + r.left) / 2;
+      return x < mid ? 'left' : 'right';
+    };
+    const apply = () => {
+      const held = new Set(fingers.values());
+      for (const [a, el] of [['left', leftEl], ['right', rightEl]]) {
+        const on = held.has(a);
+        const was = this._sources.touch.has(a);
+        el.classList.toggle('is-pressed', on);
+        if (on && !was) {
+          this._sources.touch.add(a);
+          this._emit(a);
+          haptic('tick');
+        } else if (!on && was) this._sources.touch.delete(a);
+      }
+      this._sync();
+    };
+    zone.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      noteKind('touch');
+      zone.setPointerCapture?.(e.pointerId);
+      fingers.set(e.pointerId, sideOf(e.clientX));
+      apply();
+    });
+    zone.addEventListener('pointermove', (e) => {
+      if (!fingers.has(e.pointerId)) return;
+      const side = sideOf(e.clientX);
+      if (side === fingers.get(e.pointerId)) return;
+      fingers.set(e.pointerId, side);
+      apply();
+    });
+    const lift = (e) => {
+      if (!fingers.delete(e.pointerId)) return;
+      apply();
+    };
+    zone.addEventListener('pointerup', lift);
+    zone.addEventListener('pointercancel', lift);
+    zone.addEventListener('lostpointercapture', lift);
+    zone.addEventListener('contextmenu', (e) => e.preventDefault());
+    this._dpadFingers = fingers;
   }
 
   /**
@@ -127,6 +234,7 @@ export class Input {
       if (on(9) || on(8)) next.add('pause');
     }
     const had = this._sources.pad;
+    if (next.size && !had.size) noteKind('pad');
     for (const a of next) if (!had.has(a)) this._emit(a);
     // `pause` stays in the set on purpose. It is a moment rather than a state,
     // and the only thing that stops a held Start from toggling on every single
@@ -149,6 +257,7 @@ export class Input {
     this._sources.key.clear();
     this._sources.touch.clear();
     this._sources.pad.clear();
+    this._dpadFingers?.clear();
     document.querySelectorAll('.is-pressed').forEach((el) => el.classList.remove('is-pressed'));
     this._sync();
   }

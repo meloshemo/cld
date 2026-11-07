@@ -1,5 +1,7 @@
 /** Small maths / helper toolbox shared by every module. */
 
+import { t } from './i18n.js';
+
 export const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 export const lerp = (a, b, t) => a + (b - a) * t;
 export const inverseLerp = (a, b, v) => (b === a ? 0 : (v - a) / (b - a));
@@ -106,5 +108,5 @@ export function formatRecord(seconds) {
   const s = Math.floor(rest);
   const cs = Math.floor((rest * 100) % 100);
   const tail = `${String(s).padStart(m ? 2 : 1, '0')}.${String(cs).padStart(2, '0')}`;
-  return m ? `${m}:${tail}` : `${tail} sn`;
+  return m ? `${m}:${tail}` : `${tail} ${t('unit.sec')}`;
 }

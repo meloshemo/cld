@@ -3,8 +3,13 @@ package io.github.meloshemo.pengu;
 import android.annotation.SuppressLint;
 import android.os.Build;
 import android.os.Bundle;
+import java.util.Locale;
+import android.view.DisplayCutout;
+import android.view.HapticFeedbackConstants;
 import android.view.View;
+import android.view.WindowInsets;
 import android.view.WindowManager;
+import android.webkit.JavascriptInterface;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
@@ -42,6 +47,56 @@ import android.app.Activity;
 public class MainActivity extends Activity {
 
   private WebView web;
+  /** The last insets the page was told about, replayed once it has loaded. */
+  private String insetsJs;
+
+  /**
+   * The camera hole, in CSS pixels, written into the page as --native-safe-*.
+   *
+   * Only the cutout is counted. The status and navigation bars are hidden in
+   * immersive mode and come back only for a moment when swiped in, and a
+   * layout that jumped every time they did would be worse than one that lets
+   * them float over the game for a second.
+   */
+  private void pushInsets(WindowInsets insets) {
+    int t = 0, r = 0, b = 0, l = 0;
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+      DisplayCutout cut = insets.getDisplayCutout();
+      if (cut != null) {
+        t = cut.getSafeInsetTop();
+        r = cut.getSafeInsetRight();
+        b = cut.getSafeInsetBottom();
+        l = cut.getSafeInsetLeft();
+      }
+    }
+    float d = getResources().getDisplayMetrics().density;
+    if (d <= 0) d = 1;
+    String js = String.format(Locale.ROOT,
+        "(function(s){s.setProperty('--native-safe-t','%.1fpx');"
+            + "s.setProperty('--native-safe-r','%.1fpx');"
+            + "s.setProperty('--native-safe-b','%.1fpx');"
+            + "s.setProperty('--native-safe-l','%.1fpx');})"
+            + "(document.documentElement.style)",
+        t / d, r / d, b / d, l / d);
+    if (js.equals(insetsJs)) return;
+    insetsJs = js;
+    if (web != null) web.evaluateJavascript(js, null);
+  }
+
+  /** What the page may ask of the phone. One thing, and nothing that leaves it. */
+  private final class NativeBridge {
+    @JavascriptInterface
+    public void haptic(String kind) {
+      final int type;
+      if ("jump".equals(kind)) type = HapticFeedbackConstants.KEYBOARD_TAP;
+      else if ("tick".equals(kind)) type = HapticFeedbackConstants.CLOCK_TICK;
+      else if ("hit".equals(kind)) type = HapticFeedbackConstants.LONG_PRESS;
+      else type = HapticFeedbackConstants.VIRTUAL_KEY;
+      final WebView view = web;
+      if (view == null) return;
+      view.post(() -> view.performHapticFeedback(type, HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING));
+    }
+  }
 
   @SuppressLint("SetJavaScriptEnabled")
   @Override
@@ -93,7 +148,33 @@ public class MainActivity extends Activity {
         // the game with a blank page.
         return true;
       }
+
+      @Override
+      public void onPageFinished(WebView view, String url) {
+        // The insets may have been measured before the page existed to hear
+        // about them, so the page is told again once it is there.
+        if (insetsJs != null) view.evaluateJavascript(insetsJs, null);
+      }
     });
+
+    // Draw into the camera-hole side of the screen on every version, not only
+    // where Android 15 forces it, so a phone held sideways looks the same on
+    // all of them: the ice runs edge to edge and the page keeps its buttons
+    // out of the hole using the insets below.
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+      WindowManager.LayoutParams lp = getWindow().getAttributes();
+      lp.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+      getWindow().setAttributes(lp);
+    }
+    web.setOnApplyWindowInsetsListener((v, insets) -> {
+      pushInsets(insets);
+      return v.onApplyWindowInsets(insets);
+    });
+
+    // A tap of the phone's own haptics when a pad is pressed. This goes
+    // through the view's haptic feedback, which needs no vibrate permission,
+    // and it still obeys the system "touch feedback" switch.
+    web.addJavascriptInterface(new NativeBridge(), "PenguNative");
 
     setContentView(web);
     web.loadUrl("https://appassets.androidplatform.net/assets/pengu.html");

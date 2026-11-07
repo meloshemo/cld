@@ -12,6 +12,7 @@
  * neighbours. When there is a backend, the same points feed a real table with
  * no changes to how they are earned.
  */
+import { t } from '../core/i18n.js';
 
 export const TIERS = [
   { id: 'bronze', name: 'Bronz', at: 0, color: '#c98a52', en: { name: 'Bronze' } },
@@ -86,17 +87,20 @@ export function scoreRun(result) {
     if (value > 0) rows.push({ label, value });
   };
 
+  // Translated here rather than on the card, because the rows are stored
+  // with the result and the card only prints them. They used to be Turkish
+  // literals, so a player in English read "Bölüm tamam" under "League points".
   if (result.daily) {
-    add('Günün bölümü', POINTS.daily);
+    add(t('league.daily'), POINTS.daily);
     const done = result.objectivesDone ?? 0;
-    add(`Günün hedefleri ×${done}`, done * POINTS.dailyObjective);
+    add(t('league.goals', { n: done }), done * POINTS.dailyObjective);
   } else {
-    add('Bölüm tamam', POINTS.clear);
+    add(t('league.clear'), POINTS.clear);
   }
-  add(`${result.stars} yıldız`, (result.stars ?? 0) * POINTS.perStar);
-  if (result.deaths === 0) add('Ölmeden', POINTS.flawless);
-  if (result.fish >= result.totalFish && result.totalFish > 0) add('Tüm balıklar', POINTS.allFish);
-  if (result.time <= result.target) add('Süre altında', POINTS.underTarget);
+  add(t('league.stars', { n: result.stars }), (result.stars ?? 0) * POINTS.perStar);
+  if (result.deaths === 0) add(t('league.flawless'), POINTS.flawless);
+  if (result.fish >= result.totalFish && result.totalFish > 0) add(t('league.allFish'), POINTS.allFish);
+  if (result.time <= result.target) add(t('league.underTarget'), POINTS.underTarget);
   if (result.meters > 0) {
     add(`${Math.round(result.meters)} m`, Math.round((result.meters / 100) * POINTS.perHundredMeters));
   }

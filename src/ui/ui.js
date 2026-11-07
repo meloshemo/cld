@@ -205,6 +205,7 @@ export class UI {
     // until something else opens them. The screen's job is to show the truth,
     // so it reads the save every time it appears.
     if (name === 'settings') this._syncSettings();
+    if (name === 'pause') this._fillPause();
 
     if (name && name !== 'intro') {
       // Focus the *primary* action, not the first one in the markup.
@@ -1157,6 +1158,54 @@ export class UI {
     );
   }
 
+  /**
+   * "Turn the phone" — once per launch, only on a touch screen held upright.
+   *
+   * Upright, a level shows six hundred units of width squeezed into a phone's
+   * width, so the penguin is small and the next floe is close to the edge.
+   * The game is perfectly playable like that and nobody is forced to turn, but
+   * a player who never thought to try it deserves to be told once.
+   */
+  _maybeRotateHint() {
+    const el = $('rotateHint');
+    if (!el || this._rotateTold || !this._isTouch) return;
+    const stage = this.el.touch?.parentElement?.getBoundingClientRect();
+    if (!stage || stage.height < stage.width * 1.2) return;
+    this._rotateTold = true;
+    el.hidden = false;
+    el.classList.remove('is-out');
+    clearTimeout(this._rotateTimer);
+    this._rotateTimer = setTimeout(() => {
+      el.classList.add('is-out');
+      setTimeout(() => (el.hidden = true), 320);
+    }, 3800);
+  }
+
+  /**
+   * The pause card said "Paused" and nothing else. It now says which level
+   * this is and how the attempt is going, from the same numbers the HUD
+   * prints (not from the HUD's text, which is stale until its first frame).
+   */
+  _fillPause() {
+    const meta = this.el.pauseMeta;
+    const stats = $('pauseStats');
+    if (!meta || !stats) return;
+    const g = this.game;
+    const w = g?.world;
+    if (!w) {
+      meta.textContent = '';
+      stats.textContent = '';
+      return;
+    }
+    const level = g.dailyRun ? t('title.daily') : levelLabel(g.levelId);
+    meta.textContent = [level, loc(w.def)].filter(Boolean).join('  ·  ');
+    stats.textContent = t('pause.stats', {
+      time: formatTime(w.elapsed),
+      fish: `${w.fishTaken}/${w.fish.length}`,
+      tries: String(w.deaths + (g.runDeaths ?? 0)),
+    });
+  }
+
   /** A one-off message on the title screen, reusing the in-game toast. */
   _toastOnce(text, seconds = 2.2) {
     this._showToast(text);
@@ -1180,6 +1229,7 @@ export class UI {
 
   onLevelStart(def, scale) {
     this._hideToast();
+    this._maybeRotateHint();
 
     const showIntro = Boolean(def.intro);
     if (!showIntro) {
@@ -1809,6 +1859,8 @@ export class UI {
     bindSwitch('setSfx', 'sfx', () => this.game.applySettings());
     bindSwitch('setMusic', 'music', () => this.game.applySettings());
     bindSwitch('setMotion', 'reducedMotion', () => this.game.applySettings());
+    bindSwitch('setHaptics', 'haptics', () => this.game.applySettings());
+    $('hapticsRow').hidden = !window.PenguNative;
     bindSwitch('setAssist', 'assist', () => {
       if (this.game.world) this.game.world.assist = this.save.settings.assist;
     });
@@ -1963,6 +2015,7 @@ export class UI {
     $('setSfx').checked = this.save.settings.sfx;
     $('setMusic').checked = this.save.settings.music;
     $('setMotion').checked = this.save.settings.reducedMotion;
+    $('setHaptics').checked = this.save.settings.haptics !== false;
     $('setAssist').checked = this.save.settings.assist;
   }
 
@@ -2027,8 +2080,7 @@ export class UI {
   }
 
   _bindTouch() {
-    this.input.bindButton($('padLeft'), 'left');
-    this.input.bindButton($('padRight'), 'right');
+    this.input.bindDpad($('dpad'), $('padLeft'), $('padRight'));
     this.input.bindButton($('padJump'), 'jump');
   }
 

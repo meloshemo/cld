@@ -32,7 +32,7 @@ const BRAWL_PLANS = [
     target: 30,
     heat: 1.15,
     build: (a) => {
-      a.sign('Yukarıdaki sana atıyor.\nAradaki penguenin arkasına geç.');
+      a.sign({ key: 'sign.brawl' });
       a.duel({ guardAt: 0.52, guardUp: 0.18, standAt: 0.2, shooterUp: 0.34 });
       a.scatterFish(3);
     },

@@ -5,6 +5,72 @@ değiştiği yeterli. En yeni en üstte.
 
 ---
 
+## Her telefonda tam ekran, her parmakta doğru tuş
+
+Yorumlarda arayüzden şikâyet edildi. Ekran görüntüsüyle yedi boyutta tek tek
+bakıldı (360×800, 390×844, 412×915, 768×1024, 844×390, 915×412, 1280×800) ve
+görülen her şey düzeltildi.
+
+### İngilizce oynayan Türkçe okuyordu
+
+- **İlk bölümün tabelası** telefonda da "Yürü: ← →  •  Zıpla: BOŞLUK"
+  diyordu: Türkçe, ve telefonda olmayan tuşlarla. Tabelalar artık sözlükten
+  geliyor ve **son basılan şeye** göre seçiliyor: dokunmatikte "soldaki oklar
+  / sağdaki tuş", klavyede tuş adları, kumandada çubuk ve A. Tırmanma ve kar
+  topu bölümlerinin tabelaları da aynı yoldan geçiyor.
+- **Bölüm sonu kartı** bölümün adını Türkçe yazıyordu ("Basamaklar"), lig
+  puanlarının satırları da ("Bölüm tamam", "Ölmeden", "Süre altında").
+- Süreler İngilizcede de "sn" ile bitiyordu; artık "s". "Gayzer!" uyarısı da
+  çevrildi.
+- Balığı ikiye katlama düğmesinin altında oyuncuya **"yer tutucu sayaç: reklam
+  ağı bağlı değil"** yazıyordu. Artık "Reklam yok · 5 saniye bekle".
+
+### Ekranın kenarı
+
+- Oyun artık **kenardan kenara** çiziliyor: buz ve gökyüzü kamera deliğinin ve
+  hareket çubuğunun altına kadar uzanıyor; yalnızca okunan ve basılan şeyler
+  (üst şerit, tuşlar, bütün menüler) güvenli alanın içinde kalıyor. Eskiden
+  bütün oyun güvenli kutuya sıkıştırılıyor, tuşlar da alt boşluğu bir kez daha
+  ekliyordu.
+- Android kabuğu kamera deliğini kendisi ölçüp sayfaya `--native-safe-*`
+  olarak yazıyor; tarayıcının `env(safe-area-inset-*)` değeriyle hangisi
+  büyükse o geçerli. Yan çevrilmiş telefonda pencere her sürümde deliğin
+  yanına kadar uzanıyor (`shortEdges`), yalnızca Android 15'in zorladığı
+  yerde değil.
+
+### Parmak
+
+- **Sol ve sağ tek bir yüzey.** İki ayrı düğme parmağı yakalıyordu: ←'den →'ye
+  kaydırınca penguen parmak kalkana kadar sola yürümeye devam ediyordu. Artık
+  parmak nereye kayarsa o yön.
+- Tuşların basılabilir alanı çizilenden 14 piksel geniş; basınca küçülüp bir
+  ışık halkası çıkıyor, parmağın altında da görünecek kadar geniş.
+- **Titreşim.** Android'de tuşa basınca ve düşünce kısa bir tık. Telefonun
+  kendi dokunma geri bildirimi kullanılıyor, yani **izin gerekmiyor**; manifest
+  hâlâ izinsiz. Ayarlarda kapatılabiliyor (yalnızca Android'de görünüyor) ve
+  sistemin "dokunma titreşimi" anahtarına uyuyor.
+- Duraklat düğmesinin hedefi 50 piksel, dokunmatikte kendisi de büyük. Her
+  metin düğmesi en az 48 piksel yüksek.
+
+### Menüler
+
+- **Günün hedefleri** artık Günün Bölümü kartının altından açılan bir çekmece.
+  Eskiden ekran genişliğinde ayrı bir listeydi, telefonda tikler sol kenardan
+  başlıyordu; yan çevrilmiş telefonda gizlenmesi gerekirken sonraki bir kural
+  onu geri açıyordu.
+- **Yan çevrilmiş telefonda ana ekran iki sütun:** solda ad ve kimlik, sağda
+  büyük düğme ve menü. Düğmeler artık kaydırmadan görünüyor.
+- **Duraklatma kartı** yalnızca "Duraklatıldı" diyordu; artık bölümü, süreyi,
+  balığı ve denemeyi de söylüyor.
+- **Tablet:** büyük ve uzun ekranlarda bütün arayüz %12,5 büyük. Dik tutulan
+  tablette bölüm sonu kartı üç dar sütun yerine alt alta.
+- Dik tutulan telefonda, oturum başına bir kez: "Daha geniş görüş için
+  telefonu yan çevir". Zorlamıyor, kendiliğinden kayboluyor.
+
+API 36 emülatöründe, çentikli ekran taklidiyle denendi.
+
+---
+
 ## Android 16'yı hedefliyor — Play artık başkasını kabul etmiyor
 
 Konsol, dahili teste sunmayı tek bir hatayla durdurdu: paket API 35'i

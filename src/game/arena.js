@@ -692,8 +692,10 @@ export class Arena {
     return this.fishAt(at, up, kind);
   }
 
-  sign(text, at = 0.1) {
-    this.signs.push({ x: Math.round(this.width * at), y: this.groundY - 8, text });
+  /** A sign on the floor: plain text, or `{ key }` for one that is translated. */
+  sign(what, at = 0.1) {
+    const body = typeof what === 'string' ? { text: what } : what;
+    this.signs.push({ x: Math.round(this.width * at), y: this.groundY - 8, ...body });
     return this;
   }
 

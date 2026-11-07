@@ -4,6 +4,7 @@
  */
 
 import { t, loc } from '../core/i18n.js';
+import { setHaptics, haptic } from '../core/input.js';
 import { World } from './world.js';
 import { Renderer } from './render.js';
 import { Particles } from '../core/particles.js';
@@ -70,6 +71,8 @@ export class Game {
     this.audio.setEnabled('music', s.music);
     this.renderer.reducedMotion = s.reducedMotion;
     this.particles.intensity = s.reducedMotion ? 0.35 : 1;
+    // Older saves have no such setting; haptics are on until switched off.
+    setHaptics(s.haptics !== false);
   }
 
   /* ------------------------------------------------------------ flow */
@@ -402,6 +405,7 @@ export class Game {
   }
 
   _onDeath() {
+    haptic('hit');
     const total = this.world.deaths + this.runDeaths;
     if (!this.assistOffered && !this.save.settings.assist && total >= ASSIST_AFTER_DEATHS) {
       this.assistOffered = true;
@@ -485,7 +489,7 @@ export class Game {
       fish: w.fishTaken,
       totalFish: w.fish.length,
       target: w.def.target,
-      name: w.def.name,
+      name: loc(w.def),
       isLast: this.levelId >= CRAFTED_LEVELS && !w.def.generated,
       prevBest,
       coins,

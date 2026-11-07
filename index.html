@@ -116,9 +116,15 @@
       <div class="toast" id="toast" hidden></div>
     </div>
 
+    <!-- A phone held upright sees a narrow slice of the level. Said once. -->
+    <div class="rotate-hint" id="rotateHint" hidden aria-live="polite">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="3" width="10" height="18" rx="2.4" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="17.6" r="1" fill="currentColor"/></svg>
+      <span data-i18n="ui.rotateHint">Daha geniş görüş için telefonu yan çevir</span>
+    </div>
+
     <!-- ──────────────────────  Touch controls  ─────────────────────── -->
     <div class="touch" id="touch" hidden>
-      <div class="touch__side touch__side--left">
+      <div class="touch__side touch__side--left" id="dpad">
         <button class="pad" id="padLeft" data-i18n-aria="touch.left" aria-label="Sol">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5 8 12l7 7" stroke="currentColor" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </button>
@@ -368,6 +374,10 @@
             <span class="row__text"><strong data-i18n="set.music">Müzik</strong><small data-i18n="set.musicSub">Bölüme göre değişen arka plan melodisi</small></span>
             <input type="checkbox" id="setMusic" class="switch" />
           </label>
+          <label class="row" id="hapticsRow" hidden>
+            <span class="row__text"><strong data-i18n="set.haptics">Titreşim</strong><small data-i18n="set.hapticsSub">Tuşlara basınca kısa bir tık</small></span>
+            <input type="checkbox" id="setHaptics" class="switch" />
+          </label>
           <label class="row">
             <span class="row__text"><strong data-i18n="set.motion">Az hareket</strong><small data-i18n="set.motionSub">Sarsıntı, kar ve parçacıkları azaltır</small></span>
             <input type="checkbox" id="setMotion" class="switch" />
@@ -562,6 +572,7 @@
         <div class="sheet">
           <h2 class="sheet__title" data-i18n="pause.title">Duraklatıldı</h2>
           <p class="sheet__meta" id="pauseMeta"></p>
+          <p class="pause__stats" id="pauseStats"></p>
           <div class="sheet__actions">
             <button class="btn btn--primary" id="resumeBtn" data-i18n="pause.resume">Devam et</button>
             <button class="btn" id="retryBtn" data-i18n="pause.retry">Baştan başla</button>

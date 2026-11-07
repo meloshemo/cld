@@ -109,10 +109,20 @@
 
   /* ---- Layout ------------------------------------------------------ */
   --hud-h: 3.25rem;
-  --safe-t: env(safe-area-inset-top, 0px);
-  --safe-b: env(safe-area-inset-bottom, 0px);
-  --safe-l: env(safe-area-inset-left, 0px);
-  --safe-r: env(safe-area-inset-right, 0px);
+  /*
+   * The parts of the screen a finger or an eye cannot use: a camera hole, a
+   * notch, the gesture bar. A browser says so through env(); the Android
+   * shell measures the window itself and writes --native-safe-*, because a
+   * WebView inside an immersive window does not always pass the cutout on.
+   * The larger of the two wins, so a device that reports both is not counted
+   * twice.
+   */
+  --safe-t: max(env(safe-area-inset-top, 0px), var(--native-safe-t, 0px));
+  --safe-b: max(env(safe-area-inset-bottom, 0px), var(--native-safe-b, 0px));
+  --safe-l: max(env(safe-area-inset-left, 0px), var(--native-safe-l, 0px));
+  --safe-r: max(env(safe-area-inset-right, 0px), var(--native-safe-r, 0px));
+  /* The smallest thing a thumb should ever be asked to hit. */
+  --tap: 48px;
 }
 
 @media (prefers-reduced-motion: reduce) {

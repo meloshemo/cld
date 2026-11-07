@@ -56,7 +56,7 @@ const PLANS = [
     en: { name: 'First Steps', subtitle: 'The edge of the glacier' },
     target: 30,
     tight: 0.8,
-    signs: [{ dx: 90, dy: -96, text: 'Yürü: ← →  •  Zıpla: BOŞLUK' }],
+    signs: [{ dx: 90, dy: -96, key: 'sign.walk' }],
     build: (c) => {
       c.shelf({ n: 4, gap: 0.3, w: 230 });
       c.landing({ w: 240 });
@@ -770,6 +770,7 @@ export const LEVELS = PLANS.map((plan, i) => {
     x: def.spawn.x + (s.dx ?? 0),
     y: def.spawn.y + (s.dy ?? -96),
     text: s.text,
+    key: s.key,
   }));
   return def;
 });

@@ -90,7 +90,12 @@ ul {
   inset: 0;
   display: grid;
   place-items: center;
-  padding: calc(var(--safe-t)) calc(var(--safe-r)) calc(var(--safe-b)) calc(var(--safe-l));
+  /* No padding: the ice and the sky run under the camera hole and the
+     gesture bar, edge to edge, and only the things you read or press keep
+     clear of them (the HUD, the pads, every menu). The old padding letterboxed
+     the whole game into the safe box and then the pads added the bottom inset
+     a second time on top of it. */
+  padding: 0;
   background:
     radial-gradient(120% 80% at 50% 0%, #113059 0%, transparent 60%),
     radial-gradient(90% 60% at 20% 100%, #0b2444 0%, transparent 55%),

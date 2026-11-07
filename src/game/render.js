@@ -15,6 +15,7 @@ import {
 import { getSkin, getTrail } from './skins.js';
 import { Pose } from './pose.js';
 import { t } from '../core/i18n.js';
+import { inputKind } from '../core/input.js';
 import { clamp, lerp, makeRng } from '../core/util.js';
 
 /**
@@ -1873,17 +1874,23 @@ export class Renderer {
     ctx.save();
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
+    ctx.font = '600 15px ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif';
     for (const s of world.signs) {
-      ctx.font = '600 15px ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif';
-      const wpx = ctx.measureText(s.text).width + 28;
-      ctx.fillStyle = 'rgba(6,20,40,0.55)';
-      roundRect(ctx, s.x - wpx / 2, s.y - 17, wpx, 34, 10);
+      // A sign with a key is read in the player's language and for whatever
+      // they are holding; one with plain text is shown as it is.
+      const lines = signText(s).split('\n');
+      const lh = 20;
+      const wpx = Math.max(...lines.map((l) => ctx.measureText(l).width)) + 28;
+      const hpx = 14 + lines.length * lh;
+      const top = s.y - hpx / 2;
+      ctx.fillStyle = 'rgba(6,20,40,0.62)';
+      roundRect(ctx, s.x - wpx / 2, top, wpx, hpx, 10);
       ctx.fill();
-      ctx.strokeStyle = 'rgba(160,220,255,0.35)';
+      ctx.strokeStyle = 'rgba(160,220,255,0.38)';
       ctx.lineWidth = 1;
       ctx.stroke();
       ctx.fillStyle = '#dff2ff';
-      ctx.fillText(s.text, s.x, s.y);
+      lines.forEach((l, i) => ctx.fillText(l, s.x, top + 7 + lh / 2 + i * lh));
     }
     ctx.restore();
   }
@@ -4277,4 +4284,18 @@ function roundRect(ctx, x, y, w, h, r) {
   ctx.arcTo(x, y + h, x, y, r);
   ctx.arcTo(x, y, x + w, y, r);
   ctx.closePath();
+}
+
+/**
+ * What a sign says, for this player.
+ *
+ * `sign.walk` becomes `sign.walk.touch`, `.keys` or `.pad`, whichever matches
+ * the last thing pressed, falling back to the bare key for a sign that reads
+ * the same everywhere.
+ */
+function signText(s) {
+  if (!s.key) return s.text ?? '';
+  const specific = `${s.key}.${inputKind()}`;
+  const got = t(specific);
+  return got !== specific ? got : t(s.key);
 }

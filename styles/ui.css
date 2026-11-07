@@ -6,7 +6,8 @@
   position: absolute;
   inset: 0 0 auto 0;
   z-index: 3;
-  padding: var(--s-3) var(--s-3) 0;
+  padding: calc(var(--s-3) + var(--safe-t)) calc(var(--s-3) + var(--safe-r)) 0
+    calc(var(--s-3) + var(--safe-l));
   pointer-events: none;
   display: flex;
   flex-direction: column;
@@ -220,7 +221,8 @@
   display: flex;
   justify-content: space-between;
   align-items: flex-end;
-  padding: 0 var(--pad-edge) calc(var(--pad-edge) + var(--safe-b));
+  padding: 0 calc(var(--pad-edge) + var(--safe-r)) calc(var(--pad-edge) + var(--safe-b))
+    calc(var(--pad-edge) + var(--safe-l));
   pointer-events: none;
 }
 
@@ -299,7 +301,8 @@
  */
 @container stage (max-height: 560px) {
   .hud {
-    padding: var(--s-2) var(--s-2) 0;
+    padding: calc(var(--s-2) + var(--safe-t)) calc(var(--s-2) + var(--safe-r)) 0
+      calc(var(--s-2) + var(--safe-l));
     gap: var(--s-1);
   }
   .hud__bar {
@@ -326,7 +329,8 @@
   z-index: 5;
   display: grid;
   place-items: center;
-  padding: calc(var(--s-5) + var(--safe-t)) var(--s-5) calc(var(--s-5) + var(--safe-b));
+  padding: calc(var(--s-5) + var(--safe-t)) calc(var(--s-5) + var(--safe-r))
+    calc(var(--s-5) + var(--safe-b)) calc(var(--s-5) + var(--safe-l));
   overflow-y: auto;
   overscroll-behavior: contain;
   background:
@@ -506,7 +510,7 @@
   justify-content: center;
   gap: 0.1em;
   padding: 0.72em 1.35em;
-  min-height: 2.9rem;
+  min-height: max(2.9rem, var(--tap));
   font-size: var(--fs-sm);
   font-weight: 600;
   letter-spacing: 0.005em;
@@ -1270,7 +1274,7 @@ kbd {
  * bottom. So the row layout also applies to a stage that is merely wide
  * *enough* and genuinely short, which is exactly the shape those phones are.
  */
-@container stage ((min-width: 44rem) or ((min-width: 33rem) and (max-height: 30rem))) {
+@container stage (((min-width: 44rem) and (orientation: landscape)) or ((min-width: 33rem) and (max-height: 30rem))) {
   .sheet--win {
     width: min(100%, 62rem);
     flex-direction: row;
@@ -1495,7 +1499,8 @@ kbd {
 
 @media (max-width: 560px) {
   .overlay {
-    padding: calc(var(--s-4) + var(--safe-t)) var(--s-4) calc(var(--s-4) + var(--safe-b));
+    padding: calc(var(--s-4) + var(--safe-t)) calc(var(--s-4) + var(--safe-r))
+      calc(var(--s-4) + var(--safe-b)) calc(var(--s-4) + var(--safe-l));
     align-items: start;
   }
 
@@ -1513,7 +1518,8 @@ kbd {
   }
 
   .hud {
-    padding: calc(var(--s-2) + var(--safe-t)) var(--s-2) 0;
+    padding: calc(var(--s-2) + var(--safe-t)) calc(var(--s-2) + var(--safe-r)) 0
+      calc(var(--s-2) + var(--safe-l));
   }
 }
 
@@ -2523,7 +2529,8 @@ kbd {
   flex-direction: column;
   justify-content: center;
   gap: var(--s-3);
-  padding: calc(var(--s-5) + var(--safe-t)) var(--s-5) calc(var(--s-5) + var(--safe-b));
+  padding: calc(var(--s-5) + var(--safe-t)) calc(var(--s-5) + var(--safe-r))
+    calc(var(--s-5) + var(--safe-b)) calc(var(--s-5) + var(--safe-l));
   background: var(--surface-solid);
   color: var(--text);
   overflow-y: auto;
@@ -3906,4 +3913,236 @@ kbd {
 .boardwho__name {
   font-size: var(--fs-md, 1rem);
   font-weight: 700;
+}
+
+/* ===================================================================
+   Thumbs, notches and every shape of screen
+
+   Player reviews said the controls were hard to hit and the menus were
+   cramped on some phones. Everything below is about the hand holding the
+   phone rather than the eye looking at it: hit areas larger than what is
+   drawn, a press you can see and feel, and nothing a thumb needs sitting
+   under a camera hole or a gesture bar.
+   =================================================================== */
+
+/*
+ * The pads.
+ *
+ * Each side is one surface now, and it reaches further than its buttons: a
+ * thumb that lands a little above or between the arrows still walks. The
+ * extra reach is invisible padding, so the screen does not get any busier.
+ */
+.touch__side {
+  padding: 14px;
+  margin: -14px;
+  border-radius: 36px;
+}
+
+.pad {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 8px 20px rgba(2, 8, 20, 0.32);
+  transition:
+    transform 90ms var(--e-out),
+    background var(--t-fast),
+    box-shadow var(--t-fast),
+    border-color var(--t-fast),
+    color var(--t-fast);
+}
+
+.pad svg {
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35));
+}
+
+/* The press: smaller, brighter, a ring of light. You see it even with the
+   thumb on top of it, because the ring is wider than the thumb. */
+.pad.is-pressed {
+  transform: scale(0.9);
+  color: #ffffff;
+  background: rgba(79, 215, 255, 0.4);
+  border-color: rgba(170, 236, 255, 0.9);
+  box-shadow:
+    0 0 0 6px rgba(79, 215, 255, 0.16),
+    0 0 26px rgba(79, 215, 255, 0.5);
+}
+
+.pad--jump.is-pressed {
+  background: linear-gradient(150deg, rgba(79, 215, 255, 0.62), rgba(92, 225, 166, 0.5));
+  box-shadow:
+    0 0 0 8px rgba(92, 225, 166, 0.16),
+    0 0 32px rgba(92, 225, 166, 0.5);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pad.is-pressed {
+    transform: none;
+  }
+}
+
+/*
+ * The pause button is the only thing in the top bar you press, and it was a
+ * 34-pixel circle in the corner. It keeps its size on screen and gets a
+ * 50-pixel target around it, and on a touch screen it is drawn bigger too.
+ */
+.icon-btn {
+  position: relative;
+}
+.icon-btn::after {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  border-radius: inherit;
+}
+:root[data-input='touch'] .icon-btn {
+  width: 2.5rem;
+  height: 2.5rem;
+}
+:root[data-input='touch'] .icon-btn svg {
+  width: 1.2rem;
+  height: 1.2rem;
+}
+
+/* ------------------------------------------------------------- Title */
+
+/*
+ * The day's goals hang under the daily card as a drawer.
+ *
+ * They used to be a free-standing list as wide as the screen beside a card
+ * that was not, so on a phone the ticks started at the far left edge and read
+ * as belonging to nothing; and on a sideways phone a later rule switched them
+ * back on after the rule that was meant to hide them.
+ */
+.screen--title #dailyGoals {
+  position: relative;
+  z-index: 0;
+  width: min(100%, 24rem);
+  margin-top: calc(-1 * var(--s-4) - 18px);
+  padding: calc(18px + 0.5rem) 1.1rem 0.6rem;
+  text-align: left;
+  background: rgba(155, 140, 255, 0.07);
+  border: 1px solid rgba(155, 140, 255, 0.24);
+  border-top: 0;
+  border-radius: 0 0 var(--r-lg) var(--r-lg);
+}
+.screen--title #dailyGoals:empty {
+  display: none;
+}
+.screen--title .daily {
+  position: relative;
+  z-index: 1;
+}
+
+@container stage (max-height: 560px) {
+  .screen--title #dailyGoals {
+    display: none;
+  }
+}
+
+/*
+ * A phone held sideways gets the title in two columns: who you are and the
+ * big button on the left, everything else on the right. Stacked, the
+ * buttons ran off the bottom of a 390-pixel screen and had to be scrolled to.
+ */
+@container stage (max-height: 560px) and (min-width: 600px) {
+  .screen--title {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+    grid-auto-flow: row dense;
+    align-items: center;
+    column-gap: var(--s-6);
+    row-gap: var(--s-2);
+    width: min(100%, 56rem);
+  }
+  .screen--title > .wallet,
+  .screen--title > .brand,
+  .screen--title > .who {
+    grid-column: 1;
+    justify-self: center;
+  }
+  .screen--title > .actions {
+    grid-column: 2;
+    grid-row: 1 / span 3;
+  }
+  .screen--title > .offer,
+  .screen--title > .league,
+  .screen--title > .missions,
+  .screen--title > .screen__lede,
+  .screen--title > .screen__foot {
+    grid-column: 1 / -1;
+  }
+  .screen--title .actions__row {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* ---------------------------------------------------------- Rotate hint */
+
+.rotate-hint {
+  position: absolute;
+  z-index: 4;
+  width: max-content;
+  left: 50%;
+  top: 34%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  max-width: calc(100% - 2 * var(--s-5));
+  padding: 0.6em 1.1em;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--c-ice-100);
+  background: rgba(8, 22, 44, 0.78);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-full);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  box-shadow: var(--shadow-lg);
+  pointer-events: none;
+  animation: toast-in var(--t-base) var(--e-out);
+  transition: opacity 300ms var(--e-out);
+}
+.rotate-hint svg {
+  flex: none;
+  width: 1.4rem;
+  height: 1.4rem;
+  animation: rotate-phone 1.9s var(--e-in-out) infinite;
+}
+.rotate-hint.is-out {
+  opacity: 0;
+}
+@keyframes rotate-phone {
+  0%, 25%   { transform: rotate(0deg); }
+  55%, 85%  { transform: rotate(-90deg); }
+  100%      { transform: rotate(0deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rotate-hint svg { animation: none; }
+}
+
+/* ------------------------------------------------------------- Tablets */
+
+/*
+ * A tablet held either way was drawn at a phone's type size: the level grid
+ * was a sheet of tiny cards in a sea of navy. Big, tall screens get a
+ * larger root size, and every rem in the interface grows with it.
+ */
+@media (min-width: 700px) and (min-height: 900px), (min-width: 1000px) and (min-height: 700px) and (pointer: coarse) {
+  html {
+    font-size: 112.5%;
+  }
+}
+
+/* ---------------------------------------------------------------- Pause */
+
+.pause__stats {
+  margin-top: calc(-1 * var(--s-2));
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-xs);
+  letter-spacing: 0.02em;
+  color: var(--text-faint);
+}
+.pause__stats:empty {
+  display: none;
 }
