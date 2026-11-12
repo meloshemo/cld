@@ -11,7 +11,7 @@ değiştiği yeterli. En yeni en üstte.
   on sekiz tırmanışın hiçbirinde kuş kalkmadı, "0 saldırı denendi" dedi ve
   yayın durdu. Zar artık sabit; test asıl sorusunu soruyor.
 - README paket boyutu Windows'un CRLF dönüşümüyle ölçülmüştü (724 KB, gerçek
-  710 KB).  her yerde LF istiyor; araçlar Windows'ta da çalışıyor.
+  710 KB). `.gitattributes` her yerde LF istiyor; araçlar Windows'ta da çalışıyor.
 - Dünya tabelaları telefonda ~7 piksele düşüyordu; artık okunur boyda ve ekran
   kenarında kesilmiyor. Kar topu tabelası penguenin üstüne çiziliyordu.
 - Günün Bölümü üst şeritte "SONSUZ 1" yazıyordu. Nasıl oynanır, eldeki girişe
