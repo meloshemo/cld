@@ -592,7 +592,7 @@ export class UI {
           this.refreshSkinsBadge();
         });
       } else {
-        btn.textContent = 'Kilitli';
+        btn.textContent = t('ui.locked');
         btn.disabled = true;
       }
 

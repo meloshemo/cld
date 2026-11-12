@@ -1,0 +1,9 @@
+# Every text file is LF in the working tree too. With autocrlf a Windows
+# checkout turned them into CRLF, and then the single-file build measured 14 KB
+# larger than on CI, the legal pages were generated wrong (headings as plain
+# paragraphs) and the store listing could not be parsed.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.ico binary
+*.jar binary

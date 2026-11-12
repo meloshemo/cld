@@ -17,7 +17,7 @@
 
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const out = resolve(process.cwd(), process.argv[2] ?? 'dist/pengu.html');
@@ -228,7 +228,9 @@ export function sizeKB(doc) {
 }
 
 // Run as a script: build it and write it down.
-if (import.meta.url === `file://${process.argv[1]}`) {
+// Compared as URLs: on Windows the script path is C:… and never equals
+// a file:// URL written by hand, so the tool silently did nothing there.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const { doc, links } = await build();
   await mkdir(dirname(out), { recursive: true });
   await writeFile(out, doc, 'utf8');

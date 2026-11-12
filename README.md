@@ -8,7 +8,7 @@ istiyor.
 
 **Bağımlılık yok, derleme adımı yok, backend yok, görsel/ses dosyası yok.**
 Penguen de, buz da, kuzey ışıkları da, bütün sesler de kodla üretiliyor.
-Toplam yük tek dosyada 724 KB ve çevrimdışı çalışıyor.
+Toplam yük tek dosyada 710 KB ve çevrimdışı çalışıyor.
 
 ▶ **[Oyunu aç](https://meloshemo.github.io/cld/)**
 
@@ -616,7 +616,7 @@ boşluk o sayıya göre ölçülüyor.
 - **Sabit adımlı fizik (1/120 s).** 60 Hz, 120 Hz ve 144 Hz ekranlarda oyun aynı
   hissettiriyor; arka planda kalan sekme geri geldiğinde penguen ışınlanmıyor.
 - **Görsel/ses varlığı yok.** Penguen, buzlar, kuzey ışıkları, su ve bütün sesler
-  kodla üretiliyor. Tek dosya sürümü 724 KB ve çevrimdışı çalışıyor.
+  kodla üretiliyor. Tek dosya sürümü 710 KB ve çevrimdışı çalışıyor.
 - **Metin koddan ayrı.** Arayüz metinleri tek sözlükte, içeriğe ait metinler
   girdinin kendi `en` bloğunda. Bir dil eklemek bir tablo eklemek.
 
@@ -3573,7 +3573,7 @@ anlatmak değil, olan bir şeyi olduğundan iyi anlatmaktır.
 | Müzik | Tek tema, 5 sahne, 5 katman, ses saatinde planlanıyor, ses dosyası yok |
 | Dil | Türkçe ve İngilizce, 337 metin, tarayıcıdan seçiliyor |
 | Kayıt | Tek sürümlü JSON, ileri göç, dosyaya aktarma, tek tuşla silme |
-| Çevrimdışı | Servis çalışanı + tek dosya sürümü (724 KB) |
+| Çevrimdışı | Servis çalışanı + tek dosya sürümü (710 KB) |
 | Girdi | Klavye, dokunmatik, gamepad |
 | Test | 46 node + paketleme + 11 tarayıcı paketi, hepsi tek komutta |
 | Zorluk | Ölçülen eğri: `node tools/difficulty.mjs` |

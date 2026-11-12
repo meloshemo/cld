@@ -23,7 +23,7 @@
 
 import { readFile, writeFile } from 'node:fs/promises';
 import { resolve, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -262,7 +262,9 @@ export async function build() {
   return made;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+// Compared as URLs: on Windows the script path is C:… and never equals
+// a file:// URL written by hand, so the tool silently did nothing there.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const check = process.argv.includes('--check');
   const made = await build();
   let stale = 0;

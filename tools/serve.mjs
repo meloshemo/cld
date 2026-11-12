@@ -13,7 +13,7 @@ import { createServer } from 'node:http';
 import { createReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { extname, join, normalize, resolve, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const port = Number(process.argv[2] ?? process.env.PORT ?? 8123);
@@ -92,7 +92,9 @@ export function serve(at = port) {
 }
 
 // Run directly rather than imported: `node tools/serve.mjs`
-if (import.meta.url === `file://${process.argv[1]}`) {
+// Compared as URLs: on Windows the script path is C:… and never equals
+// a file:// URL written by hand, so the tool silently did nothing there.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const server = await serveFree(port);
   console.log(`Pengu  →  http://localhost:${server.address().port}`);
   console.log('Durdurmak için Ctrl+C.');
