@@ -695,7 +695,8 @@ export class Arena {
   /** A sign on the floor: plain text, or `{ key }` for one that is translated. */
   sign(what, at = 0.1) {
     const body = typeof what === 'string' ? { text: what } : what;
-    this.signs.push({ x: Math.round(this.width * at), y: this.groundY - 8, ...body });
+    // Above head height: at ground level it was drawn across the penguin's body.
+    this.signs.push({ x: Math.round(this.width * at), y: this.groundY - 150, ...body });
     return this;
   }
 

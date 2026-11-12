@@ -1071,8 +1071,12 @@ export class UI {
 
   updateHud(world, levelId, runDeaths) {
     if (this.el.hud.hidden) return;
-    this.el.hudLevel.textContent = levelLabel(levelId);
-    this.el.hudName.textContent = loc(world.def);
+    // The daily borrows the first endless id for its size, and the HUD used to
+    // print that: "ENDLESS 1 · Level of the Day".
+    const daily = Boolean(this.game?.dailyRun);
+    this.el.hudLevel.textContent = daily ? t('title.daily') : levelLabel(levelId);
+    this.el.hudName.hidden = daily;
+    if (!daily) this.el.hudName.textContent = loc(world.def);
     this.el.hudFish.textContent = `${world.fishTaken}/${world.fish.length}`;
     this.el.hudDeaths.textContent = String(world.deaths + runDeaths);
     this.el.hudTime.textContent = formatTime(world.elapsed);

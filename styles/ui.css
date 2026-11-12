@@ -4146,3 +4146,17 @@ kbd {
 .pause__stats:empty {
   display: none;
 }
+
+/* How to play shows the controls for what is in your hands, not all three. */
+.keys--touch,
+.keys--pad {
+  display: none;
+}
+:root[data-input='touch'] .keys--touch,
+:root[data-input='pad'] .keys--pad {
+  display: block;
+}
+:root[data-input='touch'] .keys--keys,
+:root[data-input='pad'] .keys--keys {
+  display: none;
+}

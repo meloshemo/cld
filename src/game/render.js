@@ -344,7 +344,7 @@ export class Renderer {
     if (world.diving) this._airHoles(ctx, world, time);
     if (world.diving) this._vents(ctx, world, time);
     this._zonesBack(ctx, world, time);
-    this._signs(ctx, world);
+    this._signs(ctx, world, camX);
     this._floes(ctx, world, time);
     this._geysers(ctx, world, time);
     this._checkpoints(ctx, world, time);
@@ -1870,27 +1870,44 @@ export class Renderer {
 
   /* ---------------------------------------------------------------- */
 
-  _signs(ctx, world) {
+  _signs(ctx, world, camX = 0) {
     ctx.save();
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.font = '600 15px ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif';
+    /*
+     * A sign is drawn in the world, so it shrinks with the world: on a phone
+     * the first instruction of the game came out seven pixels tall. The type
+     * is sized so it is never smaller than about thirteen pixels on the glass,
+     * whatever the zoom, and the box is slid sideways when it would hang off
+     * the edge of the screen (the long English lines did).
+     */
+    const perUnit = this.canvas.width / (this.dpr || 1) / VIEW.w || 1;
+    const size = clamp(13 / perUnit, 15, 26);
+    ctx.font = `600 ${size}px ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif`;
     for (const s of world.signs) {
       // A sign with a key is read in the player's language and for whatever
       // they are holding; one with plain text is shown as it is.
       const lines = signText(s).split('\n');
-      const lh = 20;
-      const wpx = Math.max(...lines.map((l) => ctx.measureText(l).width)) + 28;
-      const hpx = 14 + lines.length * lh;
+      const lh = size * 1.34;
+      const wpx = Math.max(...lines.map((l) => ctx.measureText(l).width)) + size * 1.9;
+      const hpx = size + lines.length * lh;
       const top = s.y - hpx / 2;
-      ctx.fillStyle = 'rgba(6,20,40,0.62)';
-      roundRect(ctx, s.x - wpx / 2, top, wpx, hpx, 10);
+      const edge = 10;
+      const cx =
+        wpx + edge * 2 >= VIEW.w
+          ? camX + VIEW.w / 2
+          : clamp(s.x, camX + edge + wpx / 2, Math.max(camX + edge + wpx / 2, camX + VIEW.w - edge - wpx / 2));
+      // Only pulled in while the sign's own spot is on screen; once you have
+      // walked past it, it leaves with the scenery like everything else.
+      const x = s.x > camX - wpx / 2 && s.x < camX + VIEW.w + wpx / 2 ? cx : s.x;
+      ctx.fillStyle = 'rgba(6,20,40,0.66)';
+      roundRect(ctx, x - wpx / 2, top, wpx, hpx, 10);
       ctx.fill();
       ctx.strokeStyle = 'rgba(160,220,255,0.38)';
       ctx.lineWidth = 1;
       ctx.stroke();
       ctx.fillStyle = '#dff2ff';
-      lines.forEach((l, i) => ctx.fillText(l, s.x, top + 7 + lh / 2 + i * lh));
+      lines.forEach((l, i) => ctx.fillText(l, x, top + size / 2 + lh / 2 + i * lh));
     }
     ctx.restore();
   }
