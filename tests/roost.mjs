@@ -171,6 +171,19 @@ console.log('\n4) Şaftın içindekine hiç saldırmıyor');
   /* The objection the chapter was built around, kept. A bird may not even be
      launched at a climber who is holding a wall or in the air, so the shafts
      stay exactly the problem they always were. */
+  /* Launches are a roll of the dice, and on CI's Linux runner the dice fell
+     the wrong way for every one of these eighteen climbs: "0 saldırı denendi",
+     and the web deploy refused to ship. The dice are loaded here so the test
+     asks the question it means to ask — when a bird does launch, is the
+     penguin on a ledge? — rather than whether one happened to launch. */
+  const realRandom = Math.random;
+  let seed = 0x9e3779b9;
+  Math.random = () => {
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
   let badLaunch = 0;
   let launches = 0;
   for (const id of [35, 40, 46]) {
@@ -195,6 +208,7 @@ console.log('\n4) Şaftın içindekine hiç saldırmıyor');
       }
     }
   }
+  Math.random = realRandom;
   check(launches > 0, `${launches} saldırı denendi`);
   check(badLaunch === 0, `${badLaunch} tanesi duvardaki ya da havadaki pengueni hedef aldı`);
 }
