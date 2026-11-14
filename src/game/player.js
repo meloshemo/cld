@@ -357,6 +357,9 @@ export class Player {
     this.jumpedThisFrame = false;
     this.wasOnGround = this.onGround;
     if (this.submerged) {
+      // What the body ran into this frame, if anything. Under the ice the
+      // world reads this: rock and ice are not something you lean on down here.
+      this.scrape = null;
       this._swim(dt, intent, floes, events);
       return;
     }
@@ -1030,6 +1033,7 @@ export class Player {
       if (move > 0) this.x = fb.x - this.w;
       else if (move < 0) this.x = fb.x + fb.w;
       else continue;
+      if (this.submerged) this.scrape = f;
       this.vx = 0;
       this.drift = 0;
       box.x = this.x;
@@ -1048,6 +1052,7 @@ export class Player {
       const fb = { x: f.x, y: f.y, w: f.w, h: f.h };
       if (!rectsOverlap(box, fb)) continue;
 
+      if (this.submerged) this.scrape = f;
       if (moveY >= 0 && box.y + box.h - moveY * 0.016 <= fb.y + fb.h * 0.8) {
         // Landing on top.
         this.y = fb.y - this.h;

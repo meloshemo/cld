@@ -351,6 +351,7 @@ export class Renderer {
     this._fish(ctx, world, time);
     this._goal(ctx, world, time);
     this._hazards(ctx, world, time);
+    if (world.sharks?.length) this._sharks(ctx, world, time, camX);
     if (world.brawl) this._brawl(ctx, world, time);
     this._skuaShadow(ctx, world, time);
     this._ghost(ctx, world, time);
@@ -2419,6 +2420,130 @@ export class Renderer {
     }
     ctx.lineCap = 'butt';
     ctx.restore();
+  }
+
+  /**
+   * Sharks, and the mark that says one is coming.
+   *
+   * Drawn facing left, because they only ever come from ahead. The mark is on
+   * the right edge of the screen at the shark's own depth and pulses faster
+   * as the fish gets close, so "where" and "when" are both readable without
+   * taking your eyes off the penguin for long.
+   */
+  _sharks(ctx, world, time, camX) {
+    for (const sh of world.sharks) {
+      if (sh.warn > 0) {
+        const x = camX + VIEW.w - 44;
+        const y = sh.y + sh.h / 2;
+        const beat = 0.55 + 0.45 * Math.sin(time * (10 + (1 - sh.warn) * 14));
+        ctx.save();
+        ctx.globalAlpha = 0.55 + 0.45 * beat;
+        // Drawn large: it has under a second to be noticed at the edge of a phone.
+        ctx.translate(x, y);
+        ctx.scale(1.7, 1.7);
+        ctx.translate(-x, -y);
+        ctx.fillStyle = '#ff5d6c';
+        ctx.shadowColor = 'rgba(255,93,108,0.8)';
+        ctx.shadowBlur = 14;
+        ctx.beginPath();
+        ctx.moveTo(x - 16, y);
+        ctx.lineTo(x + 6, y - 14);
+        ctx.lineTo(x + 6, y + 14);
+        ctx.closePath();
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        // A fin over the arrow, so the mark says what is coming, not just that.
+        ctx.fillStyle = '#ffd7dc';
+        ctx.beginPath();
+        ctx.moveTo(x + 12, y + 8);
+        ctx.lineTo(x + 20, y - 12);
+        ctx.lineTo(x + 26, y + 8);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+        continue;
+      }
+      const w = sh.w;
+      const h = sh.h;
+      const cx = sh.x + w / 2;
+      const cy = sh.y + h / 2;
+      const sway = Math.sin(time * 9 + sh.t * 3) * 0.22;
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, Math.min(1, sh.fade ?? 1));
+      ctx.translate(cx, cy);
+      // Tail, swinging.
+      ctx.save();
+      ctx.translate(w * 0.36, 0);
+      ctx.rotate(sway);
+      ctx.fillStyle = '#51677f';
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(w * 0.2, -h * 0.62);
+      ctx.lineTo(w * 0.12, 0);
+      ctx.lineTo(w * 0.2, h * 0.5);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+      // Body: slate above, pale below.
+      const body = ctx.createLinearGradient(0, -h / 2, 0, h / 2);
+      body.addColorStop(0, '#4a6078');
+      body.addColorStop(0.55, '#6f879f');
+      body.addColorStop(0.56, '#dfeaf2');
+      body.addColorStop(1, '#c4d4e0');
+      ctx.fillStyle = body;
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.5, h * 0.04);
+      ctx.quadraticCurveTo(-w * 0.2, -h * 0.52, w * 0.18, -h * 0.3);
+      ctx.quadraticCurveTo(w * 0.34, -h * 0.12, w * 0.4, 0);
+      ctx.quadraticCurveTo(w * 0.3, h * 0.2, w * 0.1, h * 0.36);
+      ctx.quadraticCurveTo(-w * 0.26, h * 0.5, -w * 0.5, h * 0.04);
+      ctx.closePath();
+      ctx.fill();
+      // Dorsal and pectoral fins.
+      ctx.fillStyle = '#42566c';
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.1, -h * 0.4);
+      ctx.lineTo(w * 0.06, -h * 0.95);
+      ctx.lineTo(w * 0.14, -h * 0.34);
+      ctx.closePath();
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.14, h * 0.26);
+      ctx.lineTo(-w * 0.02, h * 0.74);
+      ctx.lineTo(w * 0.06, h * 0.3);
+      ctx.closePath();
+      ctx.fill();
+      // Gills, eye, and the mouth it is named for.
+      ctx.strokeStyle = 'rgba(30,44,60,0.55)';
+      ctx.lineWidth = 1.4;
+      for (let g = 0; g < 3; g++) {
+        ctx.beginPath();
+        ctx.moveTo(-w * 0.2 + g * 5, -h * 0.16);
+        ctx.lineTo(-w * 0.21 + g * 5, h * 0.14);
+        ctx.stroke();
+      }
+      ctx.fillStyle = '#0c1420';
+      ctx.beginPath();
+      ctx.arc(-w * 0.34, -h * 0.1, 2.6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#1b2838';
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.47, h * 0.12);
+      ctx.quadraticCurveTo(-w * 0.36, h * 0.3, -w * 0.24, h * 0.2);
+      ctx.stroke();
+      ctx.fillStyle = '#ffffff';
+      for (let k = 0; k < 4; k++) {
+        const tx = -w * 0.44 + k * 5;
+        ctx.beginPath();
+        ctx.moveTo(tx, h * 0.17 + k * 0.6);
+        ctx.lineTo(tx + 2, h * 0.27 + k * 0.4);
+        ctx.lineTo(tx + 4, h * 0.19 + k * 0.5);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.restore();
+    }
   }
 
   _hazards(ctx, world, time) {

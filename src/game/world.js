@@ -13,6 +13,7 @@ import { GhostRecorder, Ghost } from './ghost.js';
 import {
   VIEW, VIEW_LIMITS, CAM, ASSIST, ICE, STORM, WIND, SWIM, BRAWL, BOOST, CHARGED, ROT, REWARDS, AMBUSH, COLLAPSE, HUSH,
   hushAt, glazeAt, sapAt, flowAt, flumeAt, trenchDrainAt, scaleForLevel, upgradeEffect, hazardPhase, ventAt, VENT,
+  SHARK,
 } from './config.js';
 import { WATER_Y } from './levels.js';
 import { getSkin } from './skins.js';
@@ -28,6 +29,13 @@ export class World {
     this.particles = deps.particles;
     this.audio = deps.audio;
     this.assist = deps.assist ?? false;
+    /**
+     * The sea's two hard rules, switchable. They are on in the game; a test
+     * about something else entirely (how a vent breathes, what a trench
+     * costs) turns them off so it measures the one thing it is about.
+     */
+    this.reefKills = deps.reef !== false;
+    this.sharksOn = deps.sharks !== false;
 
     this.worldW = def.worldW;
     // The level's own height, independent of the screen. On a tall phone the
@@ -75,6 +83,17 @@ export class World {
      * composer inside a lungful of each other.
      */
     this.airHoles = (def.air ?? []).map((a) => ({ ...a, glow: 0 }));
+    /** Sharks in the water right now, and the clock that sends the next one. */
+    this.sharks = [];
+    const sharkT = clamp(((def.id ?? 0) - SHARK.from) / (SHARK.to - SHARK.from), 0, 1);
+    this.sharkEvery = this.diving && this.sharksOn && (def.id ?? 0) >= SHARK.from
+      ? SHARK.every[0] + (SHARK.every[1] - SHARK.every[0]) * sharkT
+      : 0;
+    this.sharkSpeed = SHARK.speed[0] + (SHARK.speed[1] - SHARK.speed[0]) * sharkT;
+    this.sharkClock = this.sharkEvery * 0.8;
+    // Its own dice, seeded by the level: the same dive meets the same sharks,
+    // which is what lets a solver (and a player on their fifth try) learn it.
+    this._sharkSeed = ((def.id ?? 1) * 2654435761) >>> 0;
     /**
      * The snowball fight. Rival penguins that throw, and what they have thrown.
      *
@@ -356,6 +375,12 @@ export class World {
    * again, which is not a hard level, it is a broken one.
    */
   _submerge() {
+    // A new attempt starts in empty water, with a moment before the first fin.
+    if (this.sharks) {
+      this.sharks.length = 0;
+      this.sharkClock = this.sharkEvery * 0.8;
+    }
+    this.reefGrace = 6;
     this.player.reset(this.respawn.x, this.respawn.y);
     this.player.submerged = this.diving;
     this.player.breath = this.player.breathMax;
@@ -531,6 +556,23 @@ export class World {
   }
 
   update(dt, intent) {
+    /*
+     * Holding still after a respawn.
+     *
+     * A swimmer who lets go floats up, and the ice overhead now kills, so a
+     * player who died and took a breath before touching the screen again
+     * died a second time for it — a checkpoint that executes you in a fifth
+     * of a second. So the rules wait: nothing is lethal about the ice, and no
+     * shark is sent, until the first press after a (re)spawn, and for a short
+     * moment after that.
+     */
+    if (this.reefGrace > 0) {
+      const acting = Boolean(intent?.axis) || Boolean(intent?.jumpHeld);
+      if (acting && this.reefGrace > 0.7) this.reefGrace = 0.7;
+      // It does not run out on its own: the lungs are the only clock on a
+      // player who has not touched the screen yet.
+      if (this.reefGrace <= 0.7) this.reefGrace = Math.max(0, this.reefGrace - dt);
+    }
     /**
      * Slack time.
      *
@@ -791,8 +833,10 @@ export class World {
 
     if (this.brawl) this._brawl(dt);
 
-    if (this.diving) this._breathe(dt);
-    else if (this.player.y > this.waterY - this.player.h * 0.35) this.die('water');
+    if (this.diving) {
+      this._breathe(dt);
+      this._sharks(dt);
+    } else if (this.player.y > this.waterY - this.player.h * 0.35) this.die('water');
 
     this._followCamera(dt);
     this.flash = Math.max(0, this.flash - dt * 2.5);
@@ -909,13 +953,159 @@ export class World {
    * A hole in the ice refills it fast enough that a breath is a beat and not a
    * wait: about a second and a half from empty, so you dip in, gasp and go.
    */
+  /** The next number from the level's own dice, in [0, 1). */
+  _sharkRoll() {
+    this._sharkSeed = (this._sharkSeed + 0x6d2b79f5) >>> 0;
+    let r = Math.imul(this._sharkSeed ^ (this._sharkSeed >>> 15), 1 | this._sharkSeed);
+    r = (r + Math.imul(r ^ (r >>> 7), 61 | r)) ^ r;
+    return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+  }
+
+  /** The open water at one x: the lowest ice above and the highest rock below. */
+  _waterAt(x, y) {
+    let top = 0;
+    let bottom = this.worldH;
+    for (const b of this.solids) {
+      if (!b.solid || x < b.x || x > b.x + b.w) continue;
+      if (b.y + b.h / 2 < y) top = Math.max(top, b.y + b.h);
+      else bottom = Math.min(bottom, b.y);
+    }
+    return { top, bottom };
+  }
+
+  /**
+   * Sharks: send them, move them, and let them bite.
+   *
+   * See `SHARK` in the config for why they are shaped the way they are.
+   */
+  _sharks(dt) {
+    if (!this.sharkEvery || this.status !== 'playing') return;
+    const p = this.player;
+    const easy = this.assist;
+    const speed = this.sharkSpeed * (easy ? SHARK.easy.speed : 1);
+
+    for (let i = this.sharks.length - 1; i >= 0; i--) {
+      const sh = this.sharks[i];
+      sh.t += dt;
+      if (sh.warn > 0) {
+        sh.warn -= dt;
+        // Until it arrives it rides the edge of the screen, at its depth.
+        sh.x = this.camera.x + VIEW.w + 30;
+        continue;
+      }
+      sh.x -= speed * dt;
+      // Ice in the way: it turns down into the dark rather than swim through
+      // a wall, which would be a shark nobody could have read.
+      const water = this._waterAt(sh.x, sh.y + sh.h / 2);
+      if (sh.y < water.top + 4 || sh.y + sh.h > water.bottom - 4) sh.gone = true;
+      // Nor into a squeeze: where the water is too low to go round it, it
+      // peels off. A shark is only ever met where there was room to miss it.
+      if (water.bottom - water.top < SHARK.h + p.h * 2 + 120) sh.gone = true;
+      // Nor through water that is already throwing the swimmer about.
+      for (const z of this.zones ?? []) {
+        if ((z.kind === 'flume' || z.kind === 'eddy') && sh.x < z.x + z.w + 60 && sh.x + sh.w > z.x - 60) sh.gone = true;
+      }
+      if (sh.gone) {
+        sh.fade = (sh.fade ?? 1) - dt * 3;
+        if (sh.fade <= 0) this.sharks.splice(i, 1);
+        continue;
+      }
+      if (sh.x + sh.w < this.camera.x - 80) {
+        this.sharks.splice(i, 1);
+        this.sharksDodged = (this.sharksDodged ?? 0) + 1;
+        continue;
+      }
+      const bite = {
+        x: sh.x + SHARK.bite.x,
+        y: sh.y + SHARK.bite.y,
+        w: sh.w - SHARK.bite.x * 2,
+        h: sh.h - SHARK.bite.y * 2,
+      };
+      if (rectsOverlap(p.box, bite)) {
+        this.die('shark');
+        return;
+      }
+    }
+
+    // Nobody is hunted while they are breathing, or on the last screen.
+    const head = { x: p.x, y: p.y, w: p.w, h: p.h * 0.45 };
+    const safe =
+      this.airHoles.some((h) => rectsOverlap(head, h)) ||
+      this.vents.some((v) => rectsOverlap(head, v)) ||
+      this.goal.x - p.centerX < VIEW.w * 0.6 ||
+      // Out of air is already the worst thing that can be happening.
+      p.breathFrac < 0.3 ||
+      this.reefGrace > 0;
+    if (safe) return;
+    this.sharkClock -= dt;
+    if (this.sharkClock > 0) return;
+    /*
+     * Never into a squeeze. A shark and a penguin do not both fit through a
+     * gate with lethal ice on each side of it, and a death nobody could have
+     * avoided is not difficulty. So the water between here and where it would
+     * appear has to be tall enough, the whole way, to go round it; otherwise
+     * the clock simply waits for open sea.
+     */
+    {
+      /* Where the two actually meet, not where each of them is now: the
+         mark shows for `warn` seconds while the swimmer keeps going, and then
+         they close on each other. That stretch is the water that has to be
+         open; a gate behind it or in front of it is nobody's problem. */
+      const mine = Math.max(120, Math.abs(p.vx));
+      const lead = mine * SHARK.warn;
+      const gap = Math.max(0, this.camera.x + VIEW.w + 30 - p.centerX);
+      const meet = p.centerX + lead + (gap * mine) / (mine + speed);
+      const from = meet - 190;
+      const to = meet + 230;
+      const need = SHARK.h + p.h * 2 + 150;
+      for (let k = 0; k <= 8; k++) {
+        const wx = from + ((to - from) * k) / 8;
+        const col = this._waterAt(wx, p.y + p.h / 2);
+        if (col.bottom - col.top < need) {
+          this.sharkClock = 0.25;
+          return;
+        }
+      }
+      // Not where the water itself is throwing the swimmer up or down: a
+      // flume or an eddy already decides the line, and a shark on that line
+      // is the unavoidable death this check exists to prevent.
+      for (const z of this.zones ?? []) {
+        if ((z.kind === 'flume' || z.kind === 'eddy') && z.x < to + 80 && z.x + z.w > from - 80) {
+          this.sharkClock = 0.25;
+          return;
+        }
+      }
+      // And not on top of a leopard seal: one thing to read at a time.
+      for (const h of this.hazards) {
+        if (h.kind === 'seal' && h.x > from - 200 && h.x < to + 200) {
+          this.sharkClock = 0.25;
+          return;
+        }
+      }
+    }
+    this.sharkClock = this.sharkEvery * (easy ? SHARK.easy.every : 1) * (0.8 + this._sharkRoll() * 0.4);
+    const x = this.camera.x + VIEW.w + 30;
+    const cy = p.y + p.h / 2;
+    // Kept inside the water it will arrive in, a little clear of both edges.
+    const water = this._waterAt(x, cy);
+    const y = clamp(cy - SHARK.h / 2, water.top + 14, Math.max(water.top + 14, water.bottom - SHARK.h - 14));
+    this.sharks.push({ x, y, w: SHARK.w, h: SHARK.h, warn: SHARK.warn, t: 0 });
+    this.sharkCount = (this.sharkCount ?? 0) + 1;
+    this._tell('shark', t('world.shark'), 2.4);
+  }
+
   _breathe(dt) {
     if (this.status !== 'playing') return;
     const p = this.player;
     const head = { x: p.x, y: p.y, w: p.w, h: p.h * 0.45 };
     let inAir = false;
+    // In a hole or at a vent the ice around you is the rim you are holding.
+    let sheltered = false;
     for (const hole of this.airHoles) {
       hole.glow = Math.max(0, hole.glow - dt * 2);
+      // The rim counts for a body's width around the hole, so climbing out of
+      // one and ducking under the lip next to it is not what kills you.
+      if (rectsOverlap(p.box, { x: hole.x - 70, y: hole.y, w: hole.w + 140, h: hole.h + 60 })) sheltered = true;
       if (!rectsOverlap(head, hole)) continue;
       inAir = true;
       hole.glow = 1;
@@ -933,6 +1123,7 @@ export class World {
     for (const v of this.vents) {
       v.blow = ventAt(v.period, v.phase, this.time);
       if (!rectsOverlap(head, v)) continue;
+      sheltered = true;
       // Said the first time a player is standing in a silent column, which is
       // the exact moment the mechanic looks broken: you have swum down to the
       // air and there is no air. One line, once, and never again.
@@ -942,6 +1133,28 @@ export class World {
       ventFill = Math.max(ventFill, v.blow);
     }
     p.breathing = inAir;
+    /*
+     * The ice overhead and the seabed are sharp.
+     *
+     * The sea used to forgive a bump: you lost a little speed and floated on,
+     * which made the easiest way through every corridor to let go and slide
+     * along the ceiling. Now touching either one ends the dive, so the button
+     * is held and released the whole way — the water column is a line you
+     * keep, not a tube you rattle down. Easy mode keeps the old bump.
+     */
+    // Inside a flume or an eddy the water decides where the body goes, so the
+    // walls there only bump: dying to a push you could not answer is not a skill.
+    for (const z of this.zones ?? []) {
+      if ((z.kind === 'flume' || z.kind === 'eddy') && p.centerX > z.x - 40 && p.centerX < z.x + z.w + 40) sheltered = true;
+    }
+    if (this.reefGrace > 0 || !this.reefKills) sheltered = true;
+    if (!sheltered && !this.assist) this._tell('reef', t('world.reef'), 2.6);
+    if (p.scrape && !sheltered && !this.assist) {
+      p.scrape = null;
+      this.die('reef');
+      return;
+    }
+    p.scrape = null;
     /**
      * Worked out before the early return, not after it.
      *

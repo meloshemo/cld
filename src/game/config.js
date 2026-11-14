@@ -2635,3 +2635,36 @@ export function upgradeEffect(owned, id) {
   if (!spec || lvl <= 0) return 0;
   return spec.levels[Math.min(lvl, spec.levels.length) - 1].effect;
 }
+
+/**
+ * Köpek balığı — the thing that comes the other way.
+ *
+ * The sea had a clock (the lungs) and walls (the ice and the bed), and from
+ * the second dive on it has traffic. A shark enters from the far side of the
+ * screen at the depth the penguin is swimming at that moment and keeps to
+ * that line, so the answer is always the same one move — be somewhere else,
+ * over it or under it — and the question is whether there is room to make it
+ * with the ice above and the rock below both lethal.
+ *
+ * It is announced: a mark on the edge of the screen at its depth for
+ * `warn` seconds before the fish itself arrives. Closing speed is the
+ * shark's plus the swimmer's, so without the mark it would be a coin toss.
+ *
+ * `every` and `speed` run from the first shark level to the last; easy mode
+ * stretches the gap and slows the fish.
+ */
+export const SHARK = {
+  /** First level with sharks. 47 is the level that teaches breathing. */
+  from: 48,
+  to: 61,
+  /** Seconds between sharks, first level → last. */
+  every: [3.4, 1.7],
+  /** Pixels per second, first level → last. */
+  speed: [150, 250],
+  warn: 0.95,
+  w: 92,
+  h: 36,
+  /** The body is drawn bigger than it bites: the fins and tail do not kill. */
+  bite: { x: 10, y: 8 },
+  easy: { every: 1.7, speed: 0.7 },
+};

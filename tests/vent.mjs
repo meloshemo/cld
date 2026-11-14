@@ -39,6 +39,10 @@ const deps = () => ({
   particles: new Proxy({}, { get: () => noop }),
   audio: new Proxy({}, { get: () => noop }),
   assist: false,
+  // This file is about when a vent blows, not about steering: its swimmer
+  // leans on the ice like the old sea allowed. dive-run swims the real rules.
+  reef: false,
+  sharks: false,
   upgrades: {},
   skin: 'normal',
 });

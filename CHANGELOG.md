@@ -5,6 +5,44 @@ değiştiği yeterli. En yeni en üstte.
 
 ---
 
+## Buz altı sertleşti: buz ve dip yakıyor, köpek balıkları geliyor
+
+Yüzme bölümü (47–61) fazla affediciydi: tuşu bırakıp tavana yaslanarak her
+koridordan kayılabiliyordu. İki kural değişti.
+
+- **Buza ve deniz tabanına değmek yakıyor.** Eskiden çarpınca yalnızca hız
+  kaybediliyordu. Artık su sütunu içinde tutulan bir çizgi; tuş yol boyunca
+  basılıp bırakılıyor. Nefes deliklerinin ve bacaların çevresi güvenli (kenara
+  tutunuyorsun), akıntı bacası ve girdap içinde duvarlar yalnızca çarpıyor
+  (suyun fırlattığı yerde ölmek beceri değil).
+- **Köpek balıkları.** 48'den itibaren karşıdan, penguenin o anki derinliğinde
+  geliyorlar ve çizgilerini bırakmıyorlar: üstünden ya da altından geçeceksin.
+  Önce ekranın sağ kenarında, geleceği derinlikte kırmızı bir işaret yanıyor.
+  Sıklık 3,4 saniyeden (48) 1,7 saniyeye (61), hız 150'den 250'ye çıkıyor.
+  Isırığı çizildiğinden küçük: yüzgeç ve kuyruk öldürmüyor.
+
+Adil kalması için yazılanlar:
+
+- Köpek balığı yalnızca **etrafından dolaşacak kadar yüksek suda** gönderiliyor
+  ve dar bir yere gelince dönüp gidiyor. Buluşma noktası hesaplanıyor (uyarı
+  süresi + iki tarafın hızı), ölçülen su orası.
+- Nefes alırken, ciğer %30'un altındayken, leopar fokunun yanında ve son
+  ekranda köpek balığı yok.
+- **Yeniden doğunca kurallar ilk dokunuşu bekliyor.** İlk denemede kontrol
+  noktası pengueni saniyenin beşte birinde tavana çarptırıp öldürüyordu; bunu
+  kontrol noktası testi yakaladı.
+- Kolay modda buz ve dip eskisi gibi yalnızca çarpıyor, köpek balıkları daha
+  seyrek ve yavaş.
+
+Çözücü (`tests/dive-run.mjs`) on beş dalışın hepsini yeni kurallarla, gerçek
+`World` ile bitiriyor; ona da "göz" verildi, çünkü eskisi deliğe giderken
+tavana yaslanıyordu. Dalış başına 2–11 köpek balığı çıkıyor.
+
+Bölüm 51'de çökme arandı: 47–61'in hepsi tarayıcıda baştan sona çizdirildi,
+hata yok, 61 kare/sn, çizim 1 ms'nin altında. Yeniden üretilemedi.
+
+---
+
 ## Yayın yeniden yeşil; tabelalar okunur
 
 - **Web yayını iki haftadır düşüyordu.** Dağın kuşu testi zar atıyordu: Linux'ta

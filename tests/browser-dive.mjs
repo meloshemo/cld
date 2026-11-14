@@ -51,7 +51,13 @@ console.log('\n2) Bırakınca yükseliyor, basınca iniyor');
 // Put it in open water first so neither the ceiling nor the bed is in the way.
 await p.evaluate(() => {
   const w = window.__pengu.world;
-  w.player.x = 900;
+  // Sections 2 to 4 measure the water itself — how fast it lifts, how fast it
+  // drains — so the two rules that end a dive are off until the next start().
+  w.reefKills = false;
+  w.sharkEvery = 0;
+  // 1100, not 900: 900 is inside the first gate, and on a slow machine the
+  // swimmer reached its lip before the speed was read.
+  w.player.x = 1100;
   w.player.y = w.worldH * 0.5;
   w.player.vx = 0;
   w.player.vy = 0;
@@ -144,12 +150,64 @@ await p.evaluate(() => window.__ctl.hold('right', true));
 await p.waitForTimeout(700);
 const stuck = await read();
 ok('delikten çıkmak için dalmak gerekiyor', stuck.x < 400, `x=${Math.round(stuck.x)}`);
-await p.evaluate(() => window.__ctl.hold('jump', true));
-await p.waitForTimeout(1700);
+// Holding the button the whole way used to be enough: the swimmer slid along
+// the seabed. The bed kills now, so this swims the way a player has to — down
+// when above the middle of the water, up when below it.
+for (let i = 0; i < 34; i++) {
+  await p.evaluate(() => {
+    const w = window.__pengu.world;
+    const pl = w.player;
+    window.__ctl.hold('jump', pl.y + pl.h / 2 < w.worldH * 0.42);
+  });
+  await p.waitForTimeout(50);
+}
 const run = await read();
 await p.evaluate(() => window.__ctl.release());
 ok('dalınca ilerliyor', run.x > 560, `x=${Math.round(run.x)}`);
 ok('hâlâ oynuyor', run.status === 'playing', run.status);
+
+/* 7b ----------------------------------------------------------------- */
+console.log('\n7b) Buz ve dip yakıyor, köpek balığı geliyor');
+await start(48);
+await p.evaluate(() => {
+  const w = window.__pengu.world;
+  w.player.x = 900;
+  w.player.y = w.worldH * 0.5;
+  window.__ctl.hold('right', true);
+  window.__ctl.hold('jump', true);
+});
+await p.waitForTimeout(1500);
+const bed = await read();
+ok('dibe değince ölüyor', bed.status !== 'playing' || (await p.evaluate(() => window.__pengu.world.deaths)) > 0, bed.status);
+await p.evaluate(() => window.__ctl.release());
+await start(48);
+const sharks = await p.evaluate(async () => {
+  const w = window.__pengu.world;
+  let seen = 0;
+  for (let i = 0; i < 240 && !seen; i++) {
+    const pl = w.player;
+    // Only the spawner is being asked about here: the ice is forgiving, the
+    // swimmer is held in one place with full lungs, and the sea is called
+    // open, so the answer does not depend on where a crude swimmer got stuck.
+    w.reefKills = false;
+    w._waterAt = () => ({ top: 0, bottom: w.worldH });
+    w.zones = [];
+    pl.x = 1100;
+    pl.breath = pl.breathMax;
+    if (w.status === 'playing') {
+      window.__ctl.hold('right', true);
+      window.__ctl.hold('jump', pl.y + pl.h / 2 < w.worldH * 0.42);
+    }
+    seen = w.sharkCount ?? 0;
+    await new Promise((r) => setTimeout(r, 50));
+  }
+  window.__ctl.release();
+  return seen;
+});
+ok('köpek balığı çıkıyor', sharks > 0, `${sharks} köpek balığı`);
+await start(47);
+await p.waitForTimeout(300);
+ok('ilk dalışta köpek balığı yok', (await p.evaluate(() => window.__pengu.world.sharkEvery)) === 0);
 
 /* 8 ------------------------------------------------------------------ */
 console.log('\n8) Konsol');

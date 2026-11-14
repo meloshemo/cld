@@ -115,6 +115,9 @@ console.log('\n4) Deniz turu gerçekten sayılıyor');
     particles: { puff() {}, splash() {}, sparkle() {}, burstIce() {} },
     audio: new Proxy({}, { get: () => () => {} }),
     assist: false,
+    // Counting seconds of swimming, not surviving them.
+    reef: false,
+    sharks: false,
     upgrades: {},
     skin: 'normal',
   });
